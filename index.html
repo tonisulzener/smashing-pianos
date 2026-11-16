@@ -7,6 +7,11 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Smashing Pianos">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Smashing Pianos</title>
 <style>
   :root { --bg:#14121a; --panel:#221f2b; --ink:#f4efe6; --mut:#a59fb3; --acc:#ffb703; --red:#e63946; }
@@ -20,6 +25,8 @@
              background:#0d0b12e0; padding:3% 4%; gap:1.1vmin; overflow-y:auto; }
   .overlay > :first-child { margin-top:auto; } .overlay > :last-child { margin-bottom:auto; }
   .overlay.hidden { display:none; }
+  #menu { background:#0d0b12f5; }
+  #menu .rules { color:#fff; }
   h1 { margin:0; font-size:clamp(26px,6.5vw,62px); letter-spacing:.02em; font-weight:900; color:var(--acc); text-shadow:0 4px 0 #b3261e, 0 8px 18px #000; transform:rotate(-2deg); }
   h2 { margin:0; font-size:clamp(20px,4.2vw,38px); color:var(--acc); }
   .sub { color:var(--mut); font-size:clamp(11px,1.9vw,16px); margin:0; }
@@ -80,14 +87,18 @@
     #wrap { max-width:none; height:100%; display:flex; justify-content:center; align-items:center;
             padding:0 env(safe-area-inset-right) 0 env(safe-area-inset-left); }
     #stage { flex:none; border-radius:0; height:auto;
-             width:min(calc(100vh * 16 / 9), calc(100vw - 124px - env(safe-area-inset-left) - env(safe-area-inset-right)));
-             width:min(calc(100dvh * 16 / 9), calc(100vw - 124px - env(safe-area-inset-left) - env(safe-area-inset-right))); }
-    #side { flex:1; min-width:116px; max-width:200px; height:100%; display:flex; flex-direction:column; gap:4px; padding:4px; }
+             width:min(calc(100vh * 16 / 9), calc(100vw - 184px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+             width:min(calc(100dvh * 16 / 9), calc(100vw - 184px - env(safe-area-inset-left) - env(safe-area-inset-right))); }
+    #side { flex:1; min-width:176px; max-width:220px; height:100%; display:flex; flex-direction:column; gap:4px; padding:4px; }
     #tools { flex:1; grid-template-columns:1fr 1fr; grid-template-rows:repeat(5,1fr); margin:0; gap:4px; min-height:0; }
     .tool { padding:2px; min-height:0; display:flex; flex-direction:column; justify-content:center; }
-    .tool .ico { font-size:22px; }
+    .tool { background:#2b2736; border-color:#4a4459; }
+    .tool.sel { background:#4a3a2a; }
+    .tool .ico { font-size:19px; }
     .tool .inf { display:none; }
-    .tool .nm { font-size:9.5px; margin-top:1px; }
+    .tool { padding:2px 0; }
+    .tool .nm { font-size:11.5px; letter-spacing:-.01em; font-weight:800; color:#fff; margin-top:1px; line-height:1.1; white-space:nowrap; }
+    .tool.off .nm { opacity:.6; }
     #foot { margin:0; } #foot .hint { display:none; }
     #foot .btns { flex:1; } #foot button { flex:1; padding:5px 2px; font-size:11px; }
     .overlay { position:fixed; z-index:10; padding:10px 20px; gap:6px; }
@@ -103,13 +114,11 @@
 
     <div id="menu" class="overlay">
       <h1>SMASHING PIANOS</h1>
-      <p class="sub">Das Spiel für Klavierstimmer mit Nerven am Ende</p>
+      <p class="sub">Das Spiel für Klavierstimmer und Klavierspieler mit Nerven am Ende</p>
       <p class="rules">
         Verstimmte, verschimmelte und abgesoffene Klaviere rollen Richtung <b>Konzertsaal</b>. Mach sie platt, bevor sie ankommen!<br>
         <b>Achtung:</b> Glänzende, frisch gestimmte Klaviere mit dem goldenen ✓ lässt du durch.<br>
-        <b>Profi-Tipp:</b> Mit der Stimmgabel 🎵 rettest du verstimmte Klaviere – das gibt Extrapunkte.<br>
-        <b>Nörgelnde Pianisten</b> verjagst du, bevor sie dir die Punkte wegmeckern.<br>
-        Alle 12 Klaviere kommt ein Endgegner: der <b>Konzertflügel des Grauens</b> oder das <b>verstaubte Cembalo</b>.
+        <b>Profi-Tipp:</b> Mit der Stimmgabel 🎵 rettest du verstimmte Klaviere – das gibt Extrapunkte.
       </p>
       <p class="rules" id="teaser"></p>
       <p class="rules rotate">📱 <b>Tipp:</b> Handy quer halten – dann ist das Spielfeld viel grösser.</p>
@@ -149,9 +158,9 @@
    ============================================================ */
 const CONFIG = {
   firma:   'Pianos Sulzener',
-  slogan:  'Klavierstimmung & Reparatur',
+  slogan:  'Klavierbau',
   telefon: '',            // z.B. '044 123 45 67'
-  web:     '',            // z.B. 'https://www.beispiel.ch'
+  web:     'https://www.pianosulzener.ch',
   social:  '',            // z.B. 'Instagram & Facebook: @beispiel'
   plakat: [               // Sprüche auf der Plakatwand im Spiel (wechseln alle 5 Sekunden)
     'Besuchen Sie unseren Online-Shop!',
