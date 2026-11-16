@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14121a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Smashing Pianos</title>
+<style>
+  :root { --bg:#14121a; --panel:#221f2b; --ink:#f4efe6; --mut:#a59fb3; --acc:#ffb703; --red:#e63946; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+  body { display:flex; flex-direction:column; align-items:center; padding:12px; min-height:100vh; }
+  #wrap { width:100%; max-width:960px; }
+  #stage { position:relative; width:100%; aspect-ratio:16/9; border-radius:12px; overflow:hidden; box-shadow:0 10px 40px #0009; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; cursor:crosshair; touch-action:none; }
+  .overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; text-align:center;
+             background:#0d0b12e0; padding:3% 4%; gap:1.1vmin; overflow-y:auto; }
+  .overlay > :first-child { margin-top:auto; } .overlay > :last-child { margin-bottom:auto; }
+  .overlay.hidden { display:none; }
+  h1 { margin:0; font-size:clamp(26px,6.5vw,62px); letter-spacing:.02em; font-weight:900; color:var(--acc); text-shadow:0 4px 0 #b3261e, 0 8px 18px #000; transform:rotate(-2deg); }
+  h2 { margin:0; font-size:clamp(20px,4.2vw,38px); color:var(--acc); }
+  .sub { color:var(--mut); font-size:clamp(11px,1.9vw,16px); margin:0; }
+  .rules { font-size:clamp(10px,1.7vw,14.5px); line-height:1.45; max-width:660px; margin:0; }
+  .rules b { color:var(--acc); }
+  .big { font-size:clamp(18px,4vw,36px); font-weight:800; margin:0; }
+  button.go { font:inherit; font-weight:800; font-size:clamp(14px,2.4vw,21px); padding:.55em 1.6em; border:0; border-radius:999px; background:var(--red); color:#fff; cursor:pointer; box-shadow:0 5px 0 #8f1d27; flex:none; }
+  button.go:active { transform:translateY(3px); box-shadow:0 2px 0 #8f1d27; }
+  .ad { background:#fff; color:#1b1b1b; border-radius:10px; padding:.6em 1.1em; max-width:600px; width:100%; font-size:clamp(10px,1.75vw,14.5px); box-shadow:0 4px 0 var(--acc); }
+  .ad strong.firma { display:block; font-size:1.3em; }
+  .ad a { color:#b3261e; font-weight:700; }
+  .coupons { list-style:none; margin:.5em 0 0; padding:.5em 0 0; border-top:2px dashed #c9a227; text-align:left; }
+  .coupons li { display:flex; justify-content:space-between; gap:.8em; padding:.12em 0; }
+  .coupons li.locked { color:#8a8a8a; }
+  .coupons code { background:#ffe9a3; border:1px dashed #b3261e; border-radius:4px; padding:0 .45em; font-weight:800; white-space:nowrap; }
+  .coupons .hint { display:block; text-align:center; color:#666; font-size:.9em; margin-top:.3em; }
+  .presented { font-size:clamp(10px,1.6vw,13px); color:var(--mut); margin:0; }
+  .presented b { color:var(--ink); }
+  #tools { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-top:10px; }
+  .tool { position:relative; overflow:hidden; font:inherit; color:var(--ink); background:var(--panel); border:2px solid #3a3547; border-radius:10px; padding:6px 4px; cursor:pointer; text-align:center; }
+  .tool .ico { font-size:21px; line-height:1; display:block; }
+  .tool .nm { font-size:11.5px; font-weight:700; display:block; margin-top:2px; }
+  .tool .inf { font-size:10px; color:var(--mut); display:block; }
+  .tool.sel { border-color:var(--acc); background:#33293a; }
+  .tool.off .ico, .tool.off .nm { opacity:.4; }
+  .tool .cd { position:absolute; left:0; bottom:0; height:4px; background:var(--acc); width:0; }
+  #foot { display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:12px; color:var(--mut); gap:10px; }
+  #foot .btns { display:flex; gap:6px; flex:none; }
+  #foot button { font:inherit; background:var(--panel); color:var(--ink); border:2px solid #3a3547; border-radius:8px; padding:4px 12px; cursor:pointer; white-space:nowrap; }
+  #status { display:none; font-size:12px; color:var(--mut); text-align:center; margin-top:6px; }
+  .rotate { display:none; }
+  @media (max-width:560px){ .tool .inf{display:none;} .tool .nm{font-size:9.5px;} }
+
+  /* ---------- Mobil ---------- */
+  html,body { overscroll-behavior:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
+  button { touch-action:manipulation; }
+  @media (hover:none) { #foot .hint { display:none; } #foot { justify-content:flex-end; } }
+
+  /* Handy hochkant: Spielfeld oben über die ganze Breite, grosse Werkzeugknöpfe darunter */
+  @media (max-width:700px) and (orientation:portrait) {
+    body { padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+    #stage { border-radius:0; }
+    .overlay { position:fixed; z-index:10; padding:24px 16px; gap:10px; }
+    #side { padding:0 6px; }
+    #status { display:block; }
+    #tools { margin-top:8px; }
+    .tool { min-height:60px; padding:8px 2px; }
+    .tool .ico { font-size:27px; }
+    .tool .inf { display:none; }
+    .tool .nm { font-size:10px; }
+    #foot button { padding:8px 14px; font-size:14px; }
+    .rotate { display:block; }
+    h1 { font-size:40px; } .rules { font-size:14px; } .sub { font-size:14px; } .ad { font-size:14px; }
+  }
+  /* Handy quer: Spielfeld füllt die Höhe, Werkzeuge als Leiste rechts */
+  @media (max-height:520px) and (orientation:landscape) {
+    body { padding:0; height:100vh; height:100dvh; overflow:hidden; }
+    #wrap { max-width:none; height:100%; display:flex; justify-content:center; align-items:center;
+            padding:0 env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+    #stage { flex:none; border-radius:0; height:auto;
+             width:min(calc(100vh * 16 / 9), calc(100vw - 124px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+             width:min(calc(100dvh * 16 / 9), calc(100vw - 124px - env(safe-area-inset-left) - env(safe-area-inset-right))); }
+    #side { flex:1; min-width:116px; max-width:200px; height:100%; display:flex; flex-direction:column; gap:4px; padding:4px; }
+    #tools { flex:1; grid-template-columns:1fr 1fr; grid-template-rows:repeat(5,1fr); margin:0; gap:4px; min-height:0; }
+    .tool { padding:2px; min-height:0; display:flex; flex-direction:column; justify-content:center; }
+    .tool .ico { font-size:22px; }
+    .tool .inf { display:none; }
+    .tool .nm { font-size:9.5px; margin-top:1px; }
+    #foot { margin:0; } #foot .hint { display:none; }
+    #foot .btns { flex:1; } #foot button { flex:1; padding:5px 2px; font-size:11px; }
+    .overlay { position:fixed; z-index:10; padding:10px 20px; gap:6px; }
+    h1 { font-size:34px; } h2 { font-size:24px; } .big { font-size:22px; }
+    .rules { font-size:12.5px; } .sub { font-size:12.5px; } .ad { font-size:12.5px; } button.go { font-size:17px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="c" width="960" height="540"></canvas>
+
+    <div id="menu" class="overlay">
+      <h1>SMASHING PIANOS</h1>
+      <p class="sub">Das Spiel für Klavierstimmer mit Nerven am Ende</p>
+      <p class="rules">
+        Verstimmte, verschimmelte und abgesoffene Klaviere rollen Richtung <b>Konzertsaal</b>. Mach sie platt, bevor sie ankommen!<br>
+        <b>Achtung:</b> Glänzende, frisch gestimmte Klaviere mit dem goldenen ✓ lässt du durch.<br>
+        <b>Profi-Tipp:</b> Mit der Stimmgabel 🎵 rettest du verstimmte Klaviere – das gibt Extrapunkte.<br>
+        <b>Nörgelnde Pianisten</b> verjagst du, bevor sie dir die Punkte wegmeckern.<br>
+        Alle 12 Klaviere kommt ein Endgegner: der <b>Konzertflügel des Grauens</b> oder das <b>verstaubte Cembalo</b>.
+      </p>
+      <p class="rules" id="teaser"></p>
+      <p class="rules rotate">📱 <b>Tipp:</b> Handy quer halten – dann ist das Spielfeld viel grösser.</p>
+      <button class="go" id="startBtn">Los geht's!</button>
+      <p class="presented">präsentiert von <b class="firma"></b> – <span class="slogan"></span></p>
+    </div>
+
+    <div id="over" class="overlay hidden">
+      <h2>Feierabend!</h2>
+      <p class="big"><span id="finalScore">0</span> Punkte</p>
+      <p class="sub"><span id="finalKills">0</span> geschrottet · <span id="finalSaved">0</span> gerettet · <span id="finalShooed">0</span> Nörgler verjagt · Rang: <b id="rank"></b> · Rekord: <span id="best">0</span></p>
+      <div class="ad">
+        <span id="adLine"></span>
+        <strong class="firma"></strong>
+        <span class="slogan"></span>
+        <span id="contact"></span>
+        <ul class="coupons" id="coupons"></ul>
+      </div>
+      <button class="go" id="againBtn">Nochmal!</button>
+    </div>
+  </div>
+
+  <div id="side">
+    <div id="status"></div>
+    <div id="tools"></div>
+    <div id="foot">
+      <span class="hint">Tasten 1–9 und 0 wählen das Werkzeug · Kettensäge: Maustaste gedrückt halten</span>
+      <span class="btns"><button id="fs">⛶ Vollbild</button><button id="mute">🔊 Ton</button></span>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   WERBUNG & GUTSCHEINE: Hier anpassen.
+   Leere Felder (telefon, web) werden einfach weggelassen.
+   ============================================================ */
+const CONFIG = {
+  firma:   'Pianos Sulzener',
+  slogan:  'Klavierstimmung & Reparatur',
+  telefon: '',            // z.B. '044 123 45 67'
+  web:     '',            // z.B. 'https://www.beispiel.ch'
+  social:  '',            // z.B. 'Instagram & Facebook: @beispiel'
+  plakat: [               // Sprüche auf der Plakatwand im Spiel (wechseln alle 5 Sekunden)
+    'Besuchen Sie unseren Online-Shop!',
+    'Kaffee in der Werkstatt? Sie sind herzlich eingeladen.',
+    'Folgen Sie uns auf Social Media!',
+    'Alles über uns auf unserer Webseite.',
+    'Verstimmt? Wir retten es, bevor es knallt.',
+    'Stimmen statt Schrotten.',
+    'Ihr Klavier hat Besseres verdient.',
+    'Damit es bei Ihnen nie so weit kommt.',
+    'Trockene Luft? Ein Venta rettet Klaviere.'
+  ],
+  gutscheine: [           // ab = nötige Punktzahl
+    { ab: 2500,  titel: '10% Rabatt auf einen Venta',   code: 'VENTA10' },
+    { ab: 6000,  titel: '15% Rabatt auf eine Klavierbank', code: 'BANK15' },
+    { ab: 10000, titel: '10% auf die nächste Stimmung', code: 'STIMMUNG10' }
+  ],
+  gutscheinHinweis: 'Code bei Pianos Sulzener nennen und einlösen.'
+};
+
+/* ---------- Setup ---------- */
+const W = 960, H = 540;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+cv.width = W * DPR; cv.height = H * DPR;
+const $ = id => document.getElementById(id);
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+document.querySelectorAll('.firma').forEach(e => e.textContent = CONFIG.firma);
+document.querySelectorAll('.slogan').forEach(e => e.textContent = CONFIG.slogan);
+if (CONFIG.gutscheine.length)
+  $('teaser').innerHTML = '🎟 <b>Echte Gutscheine</b> ab ' + CONFIG.gutscheine[0].ab + ' Punkten – einlösbar bei ' + CONFIG.firma.replace(/</g, '&lt;') + '!';
+
+const LANES = [{ y: 392, s: 0.78 }, { y: 450, s: 0.9 }, { y: 512, s: 1.02 }];
+const DOOR_X = 78, BOSS_EVERY = 12, ELE_NEED = 15;   // alle 12 Klaviere ein Endgegner, abwechselnd Flügel / Cembalo
+/* Schwierigkeit: steigt in den ersten 60 Sekunden auf 1 und danach langsam weiter (Tempo). */
+const diffNow = () => G.t < 60 ? G.t / 60 : Math.min(1 + (G.t - 60) / 240, 1.6);
+
+const TYPES = {
+  verstimmt: { name: 'Verstimmt',     hp: 4, pts: 100, speed: 1.0,  body: '#7a4a2a', dark: '#57331b' },
+  wasser:    { name: 'Wasserschaden', hp: 5, pts: 150, speed: 1.3,  body: '#4d6076', dark: '#35465a' },
+  schimmel:  { name: 'Schimmel',      hp: 8, pts: 250, speed: 0.8,  body: '#66713c', dark: '#454e25' },
+  gut:       { name: 'Frisch gestimmt', hp: 2, pts: 250, speed: 1.1, body: '#17171b', dark: '#000', good: true },
+  boss:      { name: 'Konzertflügel des Grauens', hp: 65, pts: 2000, speed: 0.5, body: '#1d1220', dark: '#0c070e', boss: true, col: '#9d4edd' },
+  pianist:   { name: 'Nörgelnder Pianist', hp: 3, pts: 200, speed: 1.2, body: '#15151a', dark: '#000', person: true },
+  cembalo:   { name: 'Das verstaubte Cembalo', hp: 42, pts: 1500, speed: 0.8, body: '#8f7d4e', dark: '#5c4f2c', boss: true, col: '#b9a56a' }
+};
+const TOOLDEF = [
+  { id: 'bat',     key: '1', ico: '🏏', nm: 'Schläger',        inf: 'schnell',            dmg: 1,  cd: 0.13 },
+  { id: 'hammer',  key: '2', ico: '🔨', nm: 'Hammer',          inf: 'wuchtig',            dmg: 3,  cd: 0.6 },
+  { id: 'saw',     key: '3', ico: '🪚', nm: 'Kettensäge',      inf: 'gedrückt halten',    dmg: 7,  cd: 0.01 },
+  { id: 'crane',   key: '4', ico: '🏗️', nm: 'Kran',            inf: '1 Tonne von oben',   dmg: 99, cd: 3.2 },
+  { id: 'rock',    key: '5', ico: '🪨', nm: 'Katapult',        inf: 'vorhalten!',         dmg: 4,  cd: 1.3, radius: 62 },
+  { id: 'tnt',     key: '6', ico: '🧨', nm: 'Dynamit',         inf: 'Flächenschaden',     dmg: 6,  cd: 0.5, radius: 125 },
+  { id: 'fall',    key: '7', ico: '🎹', nm: '5. Stock',        inf: 'Klavier von oben',   dmg: 6,  cd: 4,   radius: 90 },
+  { id: 'walze',   key: '8', ico: '🚜', nm: 'Dampfwalze',      inf: 'plättet eine Spur',  dmg: 99, cd: 16 },
+  { id: 'elefant', key: '9', ico: '🐘', nm: 'Elefant',         inf: 'schont gute Klaviere', dmg: 99, cd: 1 },
+  { id: 'fork',    key: '0', ico: '🎵', nm: 'Stimmgabel',      inf: 'retten statt schrotten', dmg: 0, cd: 3 }
+];
+const TOOLS = Object.fromEntries(TOOLDEF.map(t => [t.id, t]));
+const NOERGEL = ['Das A ist zu hoch!', 'Die Tasten sind zu weiss!', 'Der Hocker quietscht!', 'Zu viel Hall hier!', '442 Hz? Ich höre 442,3 Hz!',
+  'Das Pedal riecht komisch.', 'Früher klang alles besser.', 'Ich spiele nur bei Vollmond.', 'Das Fis guckt mich schief an!', 'Zu wenig Seele im Bass.',
+  'Der Deckel glänzt zu sehr!', 'Mir ist das Forte zu laut.'];
+const FLUCHT = ['Skandal!', 'Banausen!', 'Ich rufe meinen Agenten!', 'Unerhört!', 'Schon gut, schon gut!'];
+const NAG_COST = 25;
+const KRACH = ['KRACH!', 'SCHEPPER!', 'DOING!', 'PLÄNG!', 'RUMMS!', 'KLONK!', 'ZACK!', 'SPLITTER!'];
+
+let state = 'menu', tool = 'bat';
+let pianos, parts, texts, fx, bombs, fallers, runners, roller, elephant, crane, G, TU = null;
+const mouse = { x: W / 2, y: 300, down: false };
+let touch = matchMedia('(hover: none)').matches;   // Fingerbedienung: grössere Trefferzonen, Zielhilfen nur beim Drücken
+let SMALL = false;                                 // Spielfeld wird klein angezeigt (Handy hochkant): Schrift im Spielfeld vergrössern
+const cds = Object.fromEntries(TOOLDEF.map(t => [t.id, 0]));
+let best = 0;
+try { best = +localStorage.getItem('smashingPianosBest') || 0; } catch (e) {}
+function saveBest() { try { localStorage.setItem('smashingPianosBest', best); } catch (e) {} }
+
+function reset() {
+  pianos = []; parts = []; texts = []; fx = []; bombs = []; fallers = []; runners = []; roller = null; elephant = null; TU = null;
+  crane = { x: W / 2, fall: null, rest: 0 };
+  G = { score: 0, kills: 0, saved: 0, shooed: 0, lives: 3, combo: 0, comboT: 0, t: 0, spawnT: 1, shake: 0, tnt: 3, flash: 0,
+        ele: 0, nextBoss: BOSS_EVERY, bossN: 0, coup: 0 };   // coup: in DIESEM Spiel freigespielte Gutscheine
+  for (const k in cds) cds[k] = 0;
+}
+reset();
+
+/* ---------- Sound (WebAudio, alles synthetisch) ---------- */
+let AC = null, muted = false, noiseBuf = null, sawOsc = null, sawGain = null, tuneNodes = null, pianoWave = null, reverb = null;
+function audio() {
+  if (!AC) {
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      sawOsc = AC.createOscillator(); sawGain = AC.createGain();
+      sawOsc.type = 'sawtooth'; sawOsc.frequency.value = 95; sawGain.gain.value = 0;
+      sawOsc.connect(sawGain).connect(AC.destination); sawOsc.start();
+      // Klavier-Klangfarbe: Obertonspektrum einer angeschlagenen Saite
+      const amps = [0, 1, 0.62, 0.42, 0.3, 0.2, 0.15, 0.1, 0.075, 0.055, 0.04, 0.03, 0.022, 0.016, 0.012, 0.008];
+      pianoWave = AC.createPeriodicWave(new Float32Array(amps.length), new Float32Array(amps));
+      // Raumhall (Resonanzboden + Raum)
+      const len = Math.floor(AC.sampleRate * 0.7), imp = AC.createBuffer(2, len, AC.sampleRate);
+      for (let c = 0; c < 2; c++) { const ch = imp.getChannelData(c); for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+      reverb = AC.createConvolver(); reverb.buffer = imp;
+      const wet = AC.createGain(); wet.gain.value = 0.2; reverb.connect(wet).connect(AC.destination);
+    } catch (e) { AC = null; }
+  }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(f, dur, type = 'triangle', vol = 0.12, delay = 0, f2 = null) {
+  if (muted || !audio()) return;
+  const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(AC.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+function noise(dur, vol = 0.25, freq = 1800) {
+  if (muted || !audio()) return;
+  const t = AC.currentTime, s = AC.createBufferSource(), g = AC.createGain(), f = AC.createBiquadFilter();
+  s.buffer = noiseBuf; f.type = 'lowpass'; f.frequency.setValueAtTime(freq, t);
+  f.frequency.exponentialRampToValueAtTime(120, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f).connect(g).connect(AC.destination); s.start(t); s.stop(t + dur + 0.02);
+}
+/* Ein Klavierton: 3 Saiten pro Ton (leicht gegeneinander verstimmt = Schwebung), Hammergeräusch,
+   Obertöne klingen schneller ab als der Grundton, tiefe Töne klingen länger. verstimmt = Cent. */
+const midi = m => 440 * Math.pow(2, (m - 69) / 12);
+function piano(m, vol = 0.2, delay = 0, verstimmt = 0, laenge = 1) {
+  if (muted || !audio() || !pianoWave) return;
+  const f = midi(m) * Math.pow(2, rnd(-1, 1) * verstimmt / 1200);
+  const t = AC.currentTime + delay, dur = clamp(1.3 * Math.pow(220 / f, 0.5), 0.3, 1.8) * laenge;
+  const g = AC.createGain(), lp = AC.createBiquadFilter();
+  lp.type = 'lowpass'; lp.Q.value = 0.4;
+  lp.frequency.setValueAtTime(Math.min(f * 14, 11000), t);
+  lp.frequency.exponentialRampToValueAtTime(Math.max(f * 1.6, 300), t + dur * 0.6);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.004);
+  g.gain.exponentialRampToValueAtTime(vol * 0.42, t + 0.12);
+  g.gain.exponentialRampToValueAtTime(vol * 0.16, t + dur * 0.45);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  const spread = 1.5 + verstimmt * 0.9;
+  for (const d of [-spread, 0.3, spread * 0.8]) {
+    const o = AC.createOscillator(); o.setPeriodicWave(pianoWave);
+    o.frequency.value = f; o.detune.value = d;
+    o.connect(lp); o.start(t); o.stop(t + dur + 0.05);
+  }
+  lp.connect(g); g.connect(AC.destination); g.connect(reverb);
+  // Hammeranschlag
+  const s = AC.createBufferSource(), ng = AC.createGain(), bp = AC.createBiquadFilter();
+  s.buffer = noiseBuf; bp.type = 'bandpass'; bp.frequency.value = clamp(f * 3, 400, 5000); bp.Q.value = 0.8;
+  ng.gain.setValueAtTime(vol * 0.5, t); ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.035);
+  s.connect(bp).connect(ng); ng.connect(AC.destination); ng.connect(reverb);
+  s.start(t, Math.random() * 0.5); s.stop(t + 0.05);
+}
+const SND = {
+  // verstimmter Akkord beim Auftauchen eines kaputten Klaviers
+  schief() { const b = pick([48, 50, 53, 55]); [0, 4, 7, 12].forEach((n, i) => piano(b + n, 0.11, i * 0.07, 45)); },
+  // Schlag aufs Gehäuse: Holz + mitschwingende Saiten
+  hit()    { noise(0.09, 0.2, 2500); tone(160, 0.1, 'sine', 0.2, 0, 60); const m = Math.floor(rnd(36, 72)); piano(m, 0.09, 0, 40, 0.5); piano(m + pick([1, 6, 11]), 0.07, 0.01, 40, 0.5); },
+  // Klavier zerbricht: Holz splittert, alle Saiten auf einmal, Bass dröhnt nach
+  crash()  {
+    noise(0.35, 0.35, 5000); noise(0.1, 0.3, 9000);
+    for (let i = 0; i < 9; i++) piano(Math.floor(rnd(38, 92)), 0.1, rnd(0, 0.06), 60, 0.7);
+    piano(Math.floor(rnd(24, 31)), 0.24, 0.02, 50, 0.8); piano(Math.floor(rnd(31, 38)), 0.2, 0.05, 50, 0.8);
+  },
+  boom()   { noise(0.55, 0.5, 900); tone(130, 0.45, 'sine', 0.4, 0, 30); },
+  thud()   { noise(0.3, 0.4, 600); tone(90, 0.35, 'sine', 0.45, 0, 35); },
+  // sauber gestimmt: C-Dur-Arpeggio mit Schlussakkord
+  schoen() { [60, 64, 67, 72].forEach((m, i) => piano(m, 0.16, i * 0.06)); },
+  jingle() { [72, 76, 79, 84, 88].forEach((m, i) => piano(m, 0.16, i * 0.07)); },
+  // kaputtes Klavier erreicht den Saal: grauenhaft verstimmter Cluster
+  aua()    { [51, 52, 57, 58, 63, 64, 70].forEach((m, i) => piano(m, 0.17, i * 0.015, 70, 0.7)); tone(311, 0.3, 'sawtooth', 0.03); tone(330, 0.3, 'sawtooth', 0.03); },
+  klick()  { tone(700, 0.05, 'square', 0.04); },
+  troete() { tone(280, 0.35, 'sawtooth', 0.12, 0, 620); tone(620, 0.5, 'sawtooth', 0.12, 0.35, 380); },
+  motor()  { tone(55, 2.2, 'sawtooth', 0.12, 0, 70); noise(2.2, 0.08, 300); },
+  grauen() { [34, 33, 27].forEach((m, i) => { piano(m, 0.3, i * 0.22, 25, 0.6); piano(m - 12, 0.26, i * 0.22, 25, 0.6); piano(m + 6, 0.12, i * 0.22, 25, 0.6); }); },
+  motor()  { tone(55, 1.2, 'sawtooth', 0.12, 0, 70); noise(1.2, 0.08, 300); },
+  troete() { tone(280, 0.2, 'sawtooth', 0.12, 0, 620); tone(620, 0.3, 'sawtooth', 0.12, 0.2, 380); },
+  ploing() { tone(900, 0.5, 'triangle', 0.15, 0, 90); noise(0.1, 0.15, 4000); piano(40, 0.12, 0.05, 60, 0.5); },
+  pling()  { piano(69, 0.2); },
+  // kurze Arcade-Piepser: neues Instrument / Nörgler / verjagt
+  neu(key) {
+    if (key === 'gut') { tone(660, 0.06, 'square', 0.035); tone(990, 0.08, 'square', 0.035, 0.06); }
+    else if (key === 'pianist') { [520, 520, 390].forEach((f, i) => tone(f, 0.05, 'square', 0.035, i * 0.06)); }
+    else { tone(440, 0.06, 'square', 0.035); tone(294, 0.08, 'square', 0.035, 0.06); }
+  },
+  noergel() { tone(300, 0.07, 'square', 0.03); tone(250, 0.07, 'square', 0.03, 0.08); tone(210, 0.1, 'square', 0.03, 0.16); },
+  weg()    { tone(300, 0.25, 'square', 0.05, 0, 1400); },
+  // Cembalo: Auftritt mit barockem Triller und Lauf, bei Treffern ein Zupfer
+  cembalo() { [74, 73, 74, 73, 74, 72, 70, 69, 67, 65, 64, 62].forEach((m, i) => zupf(m, 0.1, i * 0.065, 12)); zupf(50, 0.12, 0.78, 12); },
+  zupf()   { zupf(Math.floor(rnd(50, 80)), 0.09, 0, 35); }
+};
+/* Cembalo-Ton: gezupfte Saite, hell und sehr kurz, mit Oktav-Register */
+function zupf(m, vol = 0.1, delay = 0, verstimmt = 0) {
+  if (muted || !audio()) return;
+  const f = midi(m) * Math.pow(2, rnd(-1, 1) * verstimmt / 1200), t = AC.currentTime + delay;
+  const g = AC.createGain(), hp = AC.createBiquadFilter();
+  hp.type = 'highpass'; hp.frequency.value = 500;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+  for (const k of [1, 2]) { const o = AC.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f * k; o.detune.value = k * 4; o.connect(hp); o.start(t); o.stop(t + 0.3); }
+  hp.connect(g); g.connect(AC.destination); g.connect(reverb);
+}
+
+/* ---------- Spiel-Logik ---------- */
+function makePiano(key, lane) {
+  const T = TYPES[key], L = LANES[lane], diff = diffNow(), boss = !!T.boss, s = boss ? 1 : L.s;
+  return {
+    key, T, boss, lane, x: W + (boss ? 160 : 80), y: boss ? 478 : L.y, s, hp: T.hp, maxHp: T.hp,
+    w: boss ? 230 : T.person ? 56 * s : 112 * s, h: boss ? 150 : T.person ? 116 * s : 108 * s, nagT: 0.8, nagShow: 0, nag: '',
+    speed: (40 + diff * 42) * T.speed * (boss ? 1 : rnd(0.9, 1.15)), flash: 0, tilt: 0, ph: rnd(0, 6),
+    keys: Array.from({ length: 14 }, () => rnd(-2.5, 2.5)),
+    spots: Array.from({ length: 9 }, () => [rnd(-44, 44), rnd(-96, -6), rnd(4, 11)])
+  };
+}
+function spawn() {
+  const diff = Math.min(diffNow(), 1);
+  let key;
+  if (Math.random() < 0.25) key = 'gut';
+  else { const r = Math.random(); key = r < 0.5 - diff * 0.2 ? 'verstimmt' : r < 0.74 ? 'wasser' : 'schimmel'; }
+  if (G.t > 12 && Math.random() < 0.07) key = 'pianist';
+  pianos.push(makePiano(key, Math.floor(Math.random() * 3)));
+  SND.neu(key);
+}
+function spawnBoss() {
+  if (G.bossN++ % 2 === 0) {
+    pianos.push(makePiano('boss', 1));
+    say(W / 2, 170, 'DER KONZERTFLÜGEL DES GRAUENS!', '#d36bff', 32, 2.6);
+    SND.grauen();
+  } else {
+    pianos.push(makePiano('cembalo', 1));
+    say(W / 2, 170, 'DAS VERSTAUBTE CEMBALO!', '#d9c58a', 32, 2.6);
+    say(W / 2, 205, 'Hust, hust … Anno 1723', '#fff', 18, 2.6);
+    SND.cembalo();
+  }
+  G.shake = 8;
+}
+
+function debris(p, n, burst) {
+  const cols = [p.T.body, p.T.dark, '#f5f1e6', '#f5f1e6', '#111', '#c9a227'];
+  for (let i = 0; i < n; i++) {
+    const c = pick(cols), key = c === '#f5f1e6' || c === '#111';
+    parts.push({
+      x: p.x + rnd(-0.38, 0.38) * p.w, y: p.y - rnd(0.1, 0.9) * p.h, vx: rnd(-1, 1) * burst, vy: rnd(-1.4, -0.2) * burst,
+      rot: rnd(0, 6), vr: rnd(-12, 12), w: key ? 5 : rnd(8, 30), h: key ? 16 : rnd(4, 10), c, life: rnd(1.2, 2.6), gy: p.y + rnd(-6, 10)
+    });
+  }
+}
+function dust(x, y, n, col = '#d8cfc0') {
+  for (let i = 0; i < n; i++)
+    parts.push({ x: x + rnd(-30, 30), y: y - rnd(0, 20), vx: rnd(-90, 90), vy: rnd(-70, -10), r: rnd(6, 16), c: col, life: rnd(0.4, 0.9), dust: true });
+}
+function say(x, y, text, color = '#fff', size = 22, life = 1.4) { texts.push({ x, y, text, color, size, life }); }
+
+function damage(p, dmg, quiet) {
+  if (p.dead) return;
+  if (p.boss) dmg = Math.min(dmg, 10);
+  p.hp -= dmg;
+  if (!quiet) { p.flash = 0.12; p.tilt += p.boss ? 0 : rnd(-0.05, 0.05); if (!p.T.person) debris(p, 4, 170); if (p.key === 'cembalo') { SND.zupf(); dust(p.x, p.y - 80, 5, '#b9ad8c'); } }
+  if (p.hp <= 0) destroy(p);
+}
+function shoo(p) {   // Pianisten werden nicht zerlegt, sondern verjagt
+  p.dead = true; G.shooed++;
+  G.combo = G.comboT > 0 ? G.combo + 1 : 1; G.comboT = 2.5;
+  const pts = p.T.pts * G.combo; G.score += pts;
+  say(p.x, p.y - p.h - 46, 'VERJAGT!', '#ffb703', 28);
+  say(p.x, p.y - p.h - 20, '+' + pts + (G.combo > 1 ? '  ×' + G.combo : ''), '#fff', 20);
+  runners.push({ T: p.T, x: p.x, y: p.y, s: p.s, ph: 0, hp: 1, maxHp: 1, flash: 0, nagShow: 9, nag: pick(FLUCHT) });
+  if (G.ele < ELE_NEED && ++G.ele === ELE_NEED) say(W / 2, 150, '🐘 Elefant bereit!', '#ffb703', 24);
+  SND.weg();
+}
+function destroy(p) {
+  if (p.T.person) return shoo(p);
+  p.dead = true;
+  debris(p, p.boss ? 90 : 34, p.boss ? 560 : 420); dust(p.x, p.y, p.boss ? 24 : 10);
+  for (let i = 0; i < 5; i++) texts.push({ x: p.x + rnd(-30, 30), y: p.y - 70, text: pick(['♪', '♫', '♬']), color: p.T.good ? '#ffd166' : '#9be564', size: 22, life: 1.2, vx: rnd(-40, 40) });
+  G.shake = Math.max(G.shake, p.boss ? 22 : 9);
+  if (p.T.good) {
+    G.lives--; G.combo = 0; G.score = Math.max(0, G.score - 300); G.flash = 0.35;
+    say(p.x, p.y - 120, 'STOPP! Das war frisch gestimmt!', '#ff6b6b', 24);
+    say(p.x, p.y - 92, '−300', '#ff6b6b', 20);
+    SND.crash(); SND.aua();
+  } else {
+    G.kills++;
+    G.combo = G.comboT > 0 ? G.combo + 1 : 1; G.comboT = 2.5;
+    const pts = p.T.pts * G.combo; G.score += pts;
+    say(p.x, p.y - p.h - 20, p.key === 'cembalo' ? 'CEMBALO ENTSTAUBT!' : p.boss ? 'FLÜGEL GESTUTZT!' : pick(KRACH), p.boss ? '#d36bff' : '#ffb703', p.boss ? 36 : 30, p.boss ? 2.2 : 1.4);
+    say(p.x, p.y - p.h + 10, '+' + pts + (G.combo > 1 ? '  ×' + G.combo : ''), '#fff', 20);
+    if (p.boss) { G.tnt += 2; say(W / 2, 120, '+2 Dynamit 🧨', '#ffb703', 24); SND.boom(); }
+    else if (G.kills % 12 === 0) { G.tnt++; say(W / 2, 120, '+1 Dynamit 🧨', '#ffb703', 24); }
+    if (G.ele < ELE_NEED && ++G.ele === ELE_NEED) say(W / 2, 150, '🐘 Elefant bereit!', '#ffb703', 24);
+    SND.crash();
+  }
+  if (G.lives <= 0) gameOver();
+}
+function pianoAt(x, y) {
+  const sorted = pianos.slice().sort((a, b) => b.y - a.y), pad = touch ? (SMALL ? 30 : 18) : 6;
+  return sorted.find(p => !p.dead && Math.abs(x - p.x) < p.w / 2 + 6 && y < p.y + 6 && y > p.y - p.h - 6)
+      || sorted.find(p => !p.dead && Math.abs(x - p.x) < p.w / 2 + pad && y < p.y + pad && y > p.y - p.h - pad);
+}
+function areaHit(x, y, radius, dmg) {
+  for (const p of pianos.slice()) if (!p.dead && Math.hypot(p.x - x, (p.y - p.h / 2) - y) < radius + p.w * 0.2) damage(p, dmg);
+}
+function nearestLane(y) {
+  let b = 0; LANES.forEach((L, i) => { if (Math.abs(y - (L.y - 45)) < Math.abs(y - (LANES[b].y - 45))) b = i; }); return b;
+}
+
+function use(x, y) {
+  if (state !== 'play' || cds[tool] > 0) return;
+  const T = TOOLS[tool];
+  if (tool === 'bat' || tool === 'hammer') {
+    cds[tool] = T.cd;
+    fx.push({ kind: tool, x, y, t: 0, dur: tool === 'bat' ? 0.16 : 0.26 });
+    const p = pianoAt(x, y);
+    if (p) { SND.hit(); damage(p, T.dmg); G.shake = Math.max(G.shake, tool === 'hammer' ? 6 : 2); fx.push({ kind: 'star', x, y, t: 0, dur: 0.18 }); }
+    else tone(300, 0.08, 'sine', 0.05, 0, 120);
+  } else if (tool === 'crane') {
+    if (crane.fall) return;
+    cds.crane = T.cd;
+    crane.fall = { x: crane.x, y: 70, vy: 0, ty: clamp(y, 385, 515) };
+    SND.klick();
+  } else if (tool === 'tnt') {
+    if (G.tnt <= 0) { say(x, y - 20, 'Kein Dynamit mehr!', '#ff6b6b', 18); cds.tnt = 0.3; return; }
+    G.tnt--; cds.tnt = T.cd;
+    bombs.push({ kind: 'tnt', sx: W / 2, sy: H + 10, tx: x, ty: clamp(y, 340, 520), t: 0, fl: 0.5, dur: 1 });
+    SND.klick();
+  } else if (tool === 'rock') {
+    cds.rock = T.cd;
+    bombs.push({ kind: 'rock', sx: 130, sy: H + 10, tx: x, ty: clamp(y, 340, 520), t: 0, fl: 0.9, dur: 0.9 });
+    tone(200, 0.25, 'sine', 0.1, 0, 500);
+  } else if (tool === 'fall') {
+    cds.fall = T.cd;
+    fallers.push({ x, ty: clamp(y, 385, 515), t: 0, rot: rnd(-0.5, 0.5) });
+    tone(900, 0.6, 'sine', 0.06, 0.4, 200);
+  } else if (tool === 'walze') {
+    if (roller) return;
+    cds.walze = T.cd;
+    roller = { x: -90, lane: nearestLane(y), hit: new Set() };
+    SND.motor();
+  } else if (tool === 'elefant') {
+    if (G.ele < ELE_NEED) { say(x, y - 20, 'Elefant schläft noch (' + G.ele + '/' + ELE_NEED + ')', '#ff6b6b', 18); cds.elefant = 0.4; return; }
+    G.ele = 0; cds.elefant = T.cd;
+    elephant = { x: W + 130, hit: new Set() };
+    SND.troete();
+  } else if (tool === 'fork') {
+    const p = pianoAt(x, y);
+    if (!p) return;
+    cds.fork = 0.4;
+    if (p.T.good) say(p.x, p.y - p.h - 10, 'Schon perfekt gestimmt ✓', '#ffd166', 18);
+    else if (p.key !== 'verstimmt') say(p.x, p.y - p.h - 10, p.T.person ? 'Der lässt sich nicht umstimmen!' : p.boss ? 'Der ist nicht zu retten!' : 'Da hilft keine Stimmgabel mehr!', '#ff6b6b', 18);
+    else startTune(p);
+  }
+}
+function explode(b) {
+  if (b.kind === 'rock') {
+    SND.thud(); G.shake = Math.max(G.shake, 7); dust(b.tx, b.ty, 8);
+    areaHit(b.tx, b.ty, TOOLS.rock.radius, TOOLS.rock.dmg); return;
+  }
+  SND.boom(); G.shake = 18;
+  fx.push({ kind: 'boom', x: b.tx, y: b.ty, t: 0, dur: 0.45 });
+  dust(b.tx, b.ty, 16, '#ffcf7a'); dust(b.tx, b.ty, 12, '#555');
+  areaHit(b.tx, b.ty, TOOLS.tnt.radius, TOOLS.tnt.dmg);
+}
+function craneLand(f) {
+  SND.thud(); G.shake = 15; dust(f.x, f.ty, 18);
+  for (const p of pianos.slice()) if (!p.dead && Math.abs(p.x - f.x) < p.w / 2 + 30) damage(p, 99);
+  crane.rest = 0.5; crane.restAt = { x: f.x, y: f.ty };
+}
+const FAKE = { T: TYPES.verstimmt, key: 'fall', s: 1, w: 112, h: 108, hp: 1, maxHp: 1, ph: 0, flash: 0, keys: Array(14).fill(0), spots: [] };
+
+/* ----- Stimm-Minispiel ----- */
+const TUNE_ZONE = [0.17, 0.13, 0.095], TUNE_SPEED = [2.6, 3.4, 4.3];
+function startTune(p) {
+  state = 'tune'; TU = { p, step: 0, t: rnd(0, 3), pos: 0 };
+  if (audio()) {
+    const g = AC.createGain(); g.gain.value = muted ? 0 : 0.07;
+    const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1100;
+    lp.connect(g); g.connect(AC.destination); g.connect(reverb);
+    const a = AC.createOscillator(), b = AC.createOscillator();
+    a.setPeriodicWave(pianoWave); b.setPeriodicWave(pianoWave);
+    a.frequency.value = 220; b.frequency.value = 220; a.connect(lp); b.connect(lp); a.start(); b.start();
+    piano(57, 0.2);
+    tuneNodes = { g, a, b };
+  }
+}
+function stopTuneSound() { if (tuneNodes) { try { tuneNodes.a.stop(); tuneNodes.b.stop(); } catch (e) {} tuneNodes = null; } }
+function updateTune(dt) {
+  TU.t += dt; TU.pos = Math.sin(TU.t * TUNE_SPEED[TU.step]);
+  if (tuneNodes) { tuneNodes.b.frequency.value = 220 + TU.pos * 9; tuneNodes.g.gain.value = muted ? 0 : 0.07; }
+}
+function tuneHit() {
+  if (!TU) return;
+  const p = TU.p;
+  if (Math.abs(TU.pos) <= TUNE_ZONE[TU.step]) {
+    SND.pling();
+    if (++TU.step < 3) return;
+    stopTuneSound(); state = 'play'; TU = null; cds.fork = TOOLS.fork.cd;
+    p.key = 'gut'; p.T = TYPES.gut; p.hp = p.maxHp = TYPES.gut.hp; p.tilt = 0;
+    G.saved++; G.score += 400; SND.schoen();
+    say(p.x, p.y - p.h - 40, 'GERETTET! +400', '#ffd166', 28, 1.8);
+    say(p.x, p.y - p.h - 12, 'Stimmen statt Schrotten ✓', '#fff', 17, 1.8);
+  } else {
+    stopTuneSound(); state = 'play'; TU = null; cds.fork = 6;
+    SND.ploing(); G.shake = 5;
+    say(p.x, p.y - p.h - 20, 'PLOING! Saite gerissen', '#ff6b6b', 22);
+  }
+}
+
+function update(dt) {
+  G.t += dt;
+  for (const k in cds) cds[k] = Math.max(0, cds[k] - dt);
+  G.comboT = Math.max(0, G.comboT - dt); if (G.comboT === 0) G.combo = 0;
+  G.shake = Math.max(0, G.shake - dt * 40); G.flash = Math.max(0, G.flash - dt);
+
+  const boss = pianos.find(p => p.boss);
+  if (!boss && G.kills >= G.nextBoss) { G.nextBoss += BOSS_EVERY; spawnBoss(); }
+  G.spawnT -= dt;
+  if (G.spawnT <= 0) { spawn(); G.spawnT = rnd(0.8, 1.2) * (2.1 - Math.min(diffNow(), 1) * 1.2) * (boss ? 1.4 : 1); }
+
+  // Kettensäge
+  G.sawing = null;
+  if (tool === 'saw' && mouse.down) {
+    const p = pianoAt(mouse.x, mouse.y);
+    G.sawing = p || true;
+    if (p) {
+      damage(p, TOOLS.saw.dmg * dt, true);
+      p.flash = 0.03; G.shake = Math.max(G.shake, 1.5);
+      if (Math.random() < 0.6) parts.push({ x: mouse.x, y: mouse.y, vx: rnd(-260, 260), vy: rnd(-320, -60), rot: 0, vr: 20, w: 4, h: 4, c: pick(['#ffd166', '#d9a35c', '#fff']), life: 0.5, gy: p.y });
+    }
+  }
+
+  for (const p of pianos) {
+    p.x -= p.speed * dt; p.flash = Math.max(0, p.flash - dt); p.ph += dt;
+    if (p.T.person) {   // Nörgeln kostet Punkte
+      p.nagShow -= dt; p.nagT -= dt;
+      if (p.nagT <= 0) {
+        p.nagT = rnd(2.4, 3.4); p.nagShow = 1.9; p.nag = pick(NOERGEL);
+        G.score = Math.max(0, G.score - NAG_COST); SND.noergel();
+        say(p.x + 46, p.y - p.h * 0.45, '−' + NAG_COST, '#ff6b6b', 16);
+      }
+    }
+    if (p.key === 'cembalo' && Math.random() < dt * 4)   // Staubwolke, die die Sicht nimmt
+      parts.push({ x: p.x + rnd(-150, 150), y: p.y - rnd(0, 150), vx: rnd(-30, 10), vy: rnd(-25, 5), r: rnd(16, 34), c: pick(['#b9ad8c', '#a39a80', '#cfc4a3']), life: rnd(1.2, 2.2), dust: true });
+    if (p.x - (p.boss ? 80 : 0) < DOOR_X && !p.dead) {
+      p.dead = true;
+      if (p.T.good) {
+        G.score += p.T.pts; SND.schoen();
+        say(150, p.y - 130, '♪ Gestimmt von ' + CONFIG.firma + '!', '#ffd166', 20);
+        say(150, p.y - 104, '+' + p.T.pts + ' Wohlklang', '#fff', 18);
+      } else {
+        G.lives -= p.boss ? 2 : 1; G.combo = 0; G.flash = 0.35; G.shake = 10; SND.aua();
+        say(190, p.y - 120, p.T.person ? 'Der Nörgler sagt das Konzert ab!' : p.key === 'cembalo' ? 'BAROCKES GESCHEPPER!' : p.boss ? 'DAS GRAUEN SPIELT AUF!' : 'AUA! Meine Ohren!', '#ff6b6b', 26);
+        if (G.lives <= 0) gameOver();
+      }
+    }
+  }
+
+  crane.x += (clamp(mouse.x, 110, W - 40) - crane.x) * Math.min(1, dt * 7);
+  if (crane.fall) {
+    const f = crane.fall; f.vy += 2600 * dt; f.y += f.vy * dt;
+    if (f.y >= f.ty) { craneLand(f); crane.fall = null; }
+  }
+  crane.rest = Math.max(0, crane.rest - dt);
+
+  for (const b of bombs) { b.t += dt; if (b.t >= b.dur) explode(b); }
+  bombs = bombs.filter(b => b.t < b.dur);
+
+  for (const f of fallers) {
+    f.t += dt;
+    if (f.t >= 1) {
+      SND.crash(); SND.thud(); G.shake = Math.max(G.shake, 14); dust(f.x, f.ty, 14);
+      debris(Object.assign({}, FAKE, { x: f.x, y: f.ty }), 30, 420);
+      areaHit(f.x, f.ty - 40, TOOLS.fall.radius, TOOLS.fall.dmg);
+    }
+  }
+  fallers = fallers.filter(f => f.t < 1);
+
+  if (roller) {
+    roller.x += 470 * dt;
+    for (const p of pianos.slice()) if (!p.dead && p.lane === roller.lane && !roller.hit.has(p) && Math.abs(p.x - roller.x) < p.w / 2 + 34) { roller.hit.add(p); SND.thud(); damage(p, 99); G.shake = Math.max(G.shake, 8); }
+    if (Math.random() < 0.4) dust(roller.x - 60, LANES[roller.lane].y, 1, '#bbb');
+    if (roller.x > W + 160) roller = null;
+  }
+  if (elephant) {
+    elephant.x -= 640 * dt; G.shake = Math.max(G.shake, 4);
+    for (const p of pianos.slice()) if (!p.dead && !p.T.good && !elephant.hit.has(p) && Math.abs(p.x - elephant.x) < p.w / 2 + 50) { elephant.hit.add(p); damage(p, 99); }
+    if (elephant.x < -160) elephant = null;
+  }
+  pianos = pianos.filter(p => !p.dead);
+  for (const r of runners) { r.x += 520 * dt; r.ph += dt; }
+  runners = runners.filter(r => r.x < W + 120);
+
+  // Gutscheine
+  const gs = CONFIG.gutscheine;
+  while (G.coup < gs.length && G.score >= gs[G.coup].ab) {
+    say(W / 2, 250, '🎟 GUTSCHEIN FREIGESPIELT!', '#ffd166', 30, 3);
+    say(W / 2, 285, gs[G.coup].titel + ' bei ' + CONFIG.firma, '#fff', 20, 3);
+    SND.jingle(); G.coup++;
+    if (G.score > best) { best = G.score; saveBest(); }
+  }
+}
+function updateFx(dt) {
+  for (const q of parts) {
+    q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt;
+    if (q.dust) { q.vx *= 0.94; q.vy *= 0.94; q.r += dt * 18; continue; }
+    q.vy += 1300 * dt; q.rot += q.vr * dt;
+    if (q.y > q.gy && q.vy > 0) { q.y = q.gy; q.vy *= -0.35; q.vx *= 0.6; q.vr *= 0.5; }
+  }
+  parts = parts.filter(q => q.life > 0);
+  for (const t of texts) { t.life -= dt; t.y -= (t.life > 1.4 ? 12 : 42) * dt; if (t.vx) t.x += t.vx * dt; }
+  texts = texts.filter(t => t.life > 0);
+  for (const e of fx) e.t += dt;
+  fx = fx.filter(e => e.t < e.dur);
+}
+
+function gameOver() {
+  if (state !== 'play') return;
+  state = 'over';
+  if (G.score > best) { best = G.score; saveBest(); }
+  $('finalScore').textContent = G.score; $('finalKills').textContent = G.kills; $('finalSaved').textContent = G.saved; $('finalShooed').textContent = G.shooed; $('best').textContent = best;
+  $('rank').textContent = G.kills >= 60 ? 'Abrissbirne auf zwei Beinen' : G.kills >= 35 ? 'Saitenschreck' : G.kills >= 15 ? 'Hobby-Zertrümmerer' : 'Stimmgabel-Lehrling';
+  $('adLine').textContent = G.kills === 1 ? '1 Klavier war nicht mehr zu retten. Ihres schon:' : G.kills + ' Klaviere waren nicht mehr zu retten. Ihres schon:';
+  const c = $('contact'); c.textContent = '';
+  if (CONFIG.telefon) { c.append(document.createElement('br'), '☎ ' + CONFIG.telefon); }
+  if (CONFIG.web) {
+    const a = document.createElement('a'); a.href = CONFIG.web; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = CONFIG.web.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    c.append(CONFIG.telefon ? ' · ' : document.createElement('br'), a);
+  }
+  const ul = $('coupons'); ul.textContent = '';
+  let any = false;
+  for (const [i, g] of CONFIG.gutscheine.entries()) {
+    const won = i < G.coup;
+    const li = document.createElement('li'), l = document.createElement('span'), r = document.createElement(won ? 'code' : 'span');
+    if (won) { any = true; l.textContent = '🎟 ' + g.titel; r.textContent = g.code; }
+    else { li.className = 'locked'; l.textContent = '🔒 ' + g.titel; r.textContent = 'ab ' + g.ab + ' Pkt'; }
+    li.append(l, r); ul.append(li);
+  }
+  if (CONFIG.gutscheine.length) {
+    const h = document.createElement('span'); h.className = 'hint';
+    h.textContent = any ? CONFIG.gutscheinHinweis : 'Mehr Punkte = Gutscheine freischalten!';
+    ul.append(h);
+  }
+  ul.style.display = CONFIG.gutscheine.length ? '' : 'none';
+  setTimeout(() => $('over').classList.remove('hidden'), 900);
+}
+function start() {
+  audio(); stopTuneSound(); reset(); state = 'play';
+  $('menu').classList.add('hidden'); $('over').classList.add('hidden');
+}
+
+/* ---------- Zeichnen ---------- */
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+
+function drawBackground(time) {
+  let g = ctx.createLinearGradient(0, 0, 0, 340);
+  g.addColorStop(0, '#2b2d55'); g.addColorStop(1, '#e98a5b');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, 340);
+  ctx.fillStyle = '#3a2f52';
+  const sk = [60, 110, 80, 150, 95, 130, 70, 160, 100, 120, 85, 140, 75, 115];
+  sk.forEach((h, i) => ctx.fillRect(90 + i * 64, 340 - h, 58, h));
+  ctx.fillStyle = '#ffd98a55';
+  sk.forEach((h, i) => { for (let y = 340 - h + 12; y < 325; y += 22) for (let x = 0; x < 3; x++) if ((i * 7 + x * 3 + y) % 5 < 2) ctx.fillRect(98 + i * 64 + x * 16, y, 8, 10); });
+  g = ctx.createLinearGradient(0, 335, 0, H);
+  g.addColorStop(0, '#5b5563'); g.addColorStop(1, '#2f2b36');
+  ctx.fillStyle = g; ctx.fillRect(0, 335, W, H - 335);
+  ctx.strokeStyle = '#ffffff14'; ctx.lineWidth = 2;
+  for (const L of LANES) { ctx.beginPath(); ctx.moveTo(0, L.y + 5); ctx.lineTo(W, L.y + 5); ctx.stroke(); }
+
+  // Plakatwand (Werbung) – auf kleinen Bildschirmen grösser, damit sie lesbar bleibt
+  const bx = 360, by = 150, bw = 330, bh = 112;
+  ctx.save();
+  if (SMALL) { ctx.translate(bx + bw / 2, by + bh + 80); ctx.scale(1.25, 1.25); ctx.translate(-(bx + bw / 2), -(by + bh + 80)); }
+  ctx.fillStyle = '#2a2530'; ctx.fillRect(bx + 40, by + bh, 12, 80); ctx.fillRect(bx + bw - 52, by + bh, 12, 80);
+  rr(bx - 6, by - 6, bw + 12, bh + 12, 6); ctx.fill();
+  ctx.fillStyle = '#fffaf0'; rr(bx, by, bw, bh, 3); ctx.fill();
+  ctx.fillStyle = '#b3261e'; ctx.fillRect(bx, by, bw, 8);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#1b1b1b';
+  ctx.font = '900 27px system-ui'; ctx.fillText(CONFIG.firma, bx + bw / 2, by + 45, bw - 24);
+  ctx.font = '600 13px system-ui'; ctx.fillStyle = '#b3261e'; ctx.fillText(CONFIG.slogan, bx + bw / 2, by + 65, bw - 24);
+  ctx.font = 'italic 14px system-ui'; ctx.fillStyle = '#333';
+  ctx.fillText('«' + CONFIG.plakat[Math.floor(time / 5) % CONFIG.plakat.length] + '»', bx + bw / 2, by + 88, bw - 20);
+  const contact = [CONFIG.telefon && '☎ ' + CONFIG.telefon, CONFIG.web.replace(/^https?:\/\//, '').replace(/\/$/, ''), CONFIG.social].filter(Boolean).join('  ·  ');
+  if (contact) { ctx.font = '700 12px system-ui'; ctx.fillStyle = '#1b1b1b'; ctx.fillText(contact, bx + bw / 2, by + 105, bw - 20); }
+  ctx.restore();
+}
+
+function drawHall() {
+  ctx.fillStyle = '#d9c9a8'; ctx.fillRect(0, 180, 84, H - 180);
+  ctx.fillStyle = '#b8a47d'; ctx.fillRect(84, 180, 8, H - 180);
+  ctx.fillStyle = '#8c2f2a'; ctx.beginPath(); ctx.moveTo(-10, 180); ctx.lineTo(46, 140); ctx.lineTo(102, 180); ctx.fill();
+  ctx.fillStyle = '#1b1620'; rr(14, 330, 78, 210, [40, 0, 0, 0]); ctx.fill();
+  ctx.textAlign = 'center'; ctx.font = '800 11px system-ui';
+  ctx.fillStyle = '#5a2320'; ctx.fillText('KONZERT-', 44, 212); ctx.fillText('SAAL', 44, 226);
+  ctx.font = '22px system-ui'; ctx.fillText('🎼', 44, 262);
+  ctx.font = '700 10px system-ui'; ctx.fillStyle = '#ffd98a'; ctx.fillText('← Eingang', 52, 352);
+}
+
+function drawPiano(p) {
+  if (p.T.person) return drawPianist(p);
+  if (p.key === 'cembalo') return drawCembalo(p);
+  if (p.boss) return drawBoss(p);
+  const T = p.T, dmg = 1 - p.hp / p.maxHp;
+  ctx.save();
+  ctx.translate(p.x, p.y); ctx.scale(p.s, p.s);
+  if (p.key !== 'fall') { ctx.fillStyle = '#0005'; ctx.beginPath(); ctx.ellipse(0, 2, 62, 8, 0, 0, 7); ctx.fill(); }
+  ctx.rotate(p.tilt + (T.good ? 0 : Math.sin(p.ph * 7) * 0.012));
+  if (p.key === 'wasser') { ctx.fillStyle = '#6fb7e955'; ctx.beginPath(); ctx.ellipse(8, 3, 70, 7, 0, 0, 7); ctx.fill(); }
+  ctx.fillStyle = T.dark; ctx.fillRect(-50, -34, 9, 30); ctx.fillRect(41, -34, 9, 30);
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(-45, -3, 4, 0, 7); ctx.arc(45, -3, 4, 0, 7); ctx.fill();
+  ctx.fillStyle = T.body; rr(-50, -102, 100, 96, 3); ctx.fill();
+  ctx.fillStyle = T.dark; ctx.fillRect(-50, -34, 100, 3); rr(-54, -107, 108, 7, 2); ctx.fill();
+  ctx.strokeStyle = T.good ? '#c9a227' : '#0003'; ctx.lineWidth = 1.5;
+  ctx.strokeRect(-42, -95, 84, 38); ctx.strokeRect(-42, -28, 84, 18);
+  if (T.good) { ctx.fillStyle = '#ffffff22'; ctx.beginPath(); ctx.moveTo(-40, -93); ctx.lineTo(-10, -93); ctx.lineTo(-30, -59); ctx.lineTo(-40, -59); ctx.fill(); }
+  if (p.key === 'schimmel') { ctx.fillStyle = '#2d3a14aa'; for (const s of p.spots) { ctx.beginPath(); ctx.arc(s[0], s[1], s[2], 0, 7); ctx.fill(); } }
+  if (p.key === 'wasser') {
+    ctx.fillStyle = '#8fd0ffcc';
+    p.spots.slice(0, 5).forEach((s, i) => { const d = (p.ph * 40 + i * 23) % 60; ctx.beginPath(); ctx.ellipse(s[0], -40 + d, 2.2, 4, 0, 0, 7); ctx.fill(); });
+    ctx.fillStyle = '#2a394acc'; ctx.fillRect(-50, -22, 100, 16);
+  }
+  ctx.fillStyle = T.dark; rr(-56, -52, 112, 16, 2); ctx.fill();
+  for (let i = 0; i < 14; i++) {
+    const off = T.good ? 0 : p.keys[i];
+    ctx.fillStyle = T.good ? '#fff' : (p.key === 'schimmel' ? '#d9d6a8' : '#efe6cf');
+    ctx.fillRect(-49 + i * 7, -49 + off, 6, 9);
+  }
+  ctx.fillStyle = '#111';
+  for (let i = 0; i < 13; i++) if (![2, 6, 9].includes(i)) ctx.fillRect(-45 + i * 7, -49 + (T.good ? 0 : p.keys[i] * 0.6), 4, 5);
+  if (dmg > 0.3) { ctx.strokeStyle = '#000b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-20, -102); ctx.lineTo(-8, -80); ctx.lineTo(-22, -62); ctx.lineTo(-10, -40); ctx.stroke(); }
+  if (dmg > 0.6) { ctx.beginPath(); ctx.moveTo(34, -100); ctx.lineTo(20, -76); ctx.lineTo(32, -58); ctx.moveTo(-8, -80); ctx.lineTo(14, -70); ctx.stroke(); }
+  ctx.textAlign = 'center';
+  if (T.good) {
+    ctx.fillStyle = '#c9a227'; ctx.beginPath(); ctx.arc(32, -76, 11, 0, 7); ctx.fill();
+    ctx.fillStyle = '#17171b'; ctx.font = '900 15px system-ui'; ctx.fillText('✓', 32, -71);
+    ctx.fillStyle = '#ffe9a3'; ctx.font = '14px system-ui';
+    for (let i = 0; i < 3; i++) { const a = p.ph * 2 + i * 2.1; ctx.globalAlpha = 0.5 + 0.5 * Math.sin(a * 2); ctx.fillText('✦', Math.cos(a) * 52, -62 + Math.sin(a * 1.3) * 44); }
+    ctx.globalAlpha = 1;
+  } else if (p.key === 'verstimmt') {
+    ctx.fillStyle = '#b6f04a'; ctx.font = '700 20px system-ui';
+    for (let i = 0; i < 3; i++) { const a = p.ph * 3 + i * 2; ctx.save(); ctx.translate(-28 + i * 28 + Math.sin(a) * 6, -122 - ((p.ph * 14 + i * 9) % 22)); ctx.rotate(Math.sin(a * 1.7) * 0.6); ctx.fillText(i % 2 ? '♯' : '♭', 0, 0); ctx.restore(); }
+  } else if (p.key === 'schimmel') {
+    ctx.fillStyle = '#111';
+    for (let i = 0; i < 4; i++) { const a = p.ph * (4 + i) + i * 1.7; ctx.beginPath(); ctx.arc(Math.cos(a) * (36 + i * 7), -112 + Math.sin(a * 1.4) * 16, 2, 0, 7); ctx.fill(); }
+    ctx.strokeStyle = '#a5c94b99'; ctx.lineWidth = 2;
+    for (let i = -1; i <= 1; i++) { ctx.beginPath(); for (let y = 0; y < 24; y += 3) ctx.lineTo(i * 26 + Math.sin(p.ph * 4 + y * 0.4 + i) * 4, -112 - y); ctx.stroke(); }
+  }
+  if (p.flash > 0) { ctx.globalAlpha = Math.min(1, p.flash * 6); ctx.fillStyle = '#fff'; rr(-56, -107, 112, 104, 3); ctx.fill(); ctx.globalAlpha = 1; }
+  ctx.restore();
+  if (p.hp < p.maxHp && !T.good) {
+    const w = 50 * p.s, x = p.x - w / 2, y = p.y - p.h - 16;
+    ctx.fillStyle = '#000a'; ctx.fillRect(x - 1, y - 1, w + 2, 7);
+    ctx.fillStyle = '#e63946'; ctx.fillRect(x, y, w * Math.max(0, p.hp / p.maxHp), 5);
+  }
+}
+
+function drawBoss(p) {
+  const open = 46 + Math.sin(p.ph * 5) * 14, T = p.T;
+  ctx.save(); ctx.translate(p.x, p.y + Math.abs(Math.sin(p.ph * 5)) * -4);
+  ctx.fillStyle = '#0006'; ctx.beginPath(); ctx.ellipse(0, 4, 130, 12, 0, 0, 7); ctx.fill();
+  // Beine
+  ctx.fillStyle = T.dark;
+  for (const x of [-98, 20, 92]) { ctx.beginPath(); ctx.moveTo(x - 9, -62); ctx.lineTo(x + 9, -62); ctx.lineTo(x + 5, -6); ctx.lineTo(x - 5, -6); ctx.fill(); ctx.beginPath(); ctx.arc(x, -4, 6, 0, 7); ctx.fill(); }
+  // Rachen
+  ctx.fillStyle = '#5a0f1c'; ctx.beginPath(); ctx.moveTo(112, -98); ctx.lineTo(-112, -98); ctx.lineTo(-112, -98 - open); ctx.fill();
+  ctx.strokeStyle = '#c9a22788'; ctx.lineWidth = 1;
+  for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.moveTo(-100 + i * 18, -98); ctx.lineTo(90, -98 - i * 0.8); ctx.stroke(); }
+  // Deckel (Oberkiefer)
+  ctx.fillStyle = T.body; ctx.beginPath(); ctx.moveTo(114, -96); ctx.lineTo(-114, -96 - open); ctx.lineTo(-114, -106 - open); ctx.lineTo(114, -104); ctx.fill();
+  // Korpus
+  ctx.fillStyle = T.body; rr(-114, -98, 228, 40, [6, 14, 22, 6]); ctx.fill();
+  ctx.strokeStyle = '#7b2cbf'; ctx.lineWidth = 2; ctx.stroke();
+  // Zähne
+  ctx.fillStyle = '#f5f1e6';
+  for (let i = 0; i < 7; i++) {
+    const x = -110 + i * 15, k = (x + 114) / 228, ly = -96 - open * (1 - k);
+    ctx.beginPath(); ctx.moveTo(x, -98); ctx.lineTo(x + 6, -114); ctx.lineTo(x + 12, -98); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x, ly); ctx.lineTo(x + 6, ly + 15); ctx.lineTo(x + 12, ly - 0.8); ctx.fill();
+  }
+  // Augen
+  for (const x of [-84, -52]) {
+    ctx.fillStyle = '#ffdd00'; ctx.beginPath(); ctx.ellipse(x, -78, 10, 7, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#d00000'; ctx.beginPath(); ctx.arc(x - 2, -78, 4, 0, 7); ctx.fill();
+  }
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-98, -92); ctx.lineTo(-72, -84); ctx.moveTo(-66, -84); ctx.lineTo(-40, -92); ctx.stroke();
+  ctx.fillStyle = '#c9a227'; ctx.font = '700 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText('GRAUEN & SÖHNE', 40, -73);
+  ctx.fillStyle = '#d36bff'; ctx.font = '700 22px system-ui';
+  for (let i = 0; i < 4; i++) { const a = p.ph * 2.5 + i * 1.6; ctx.fillText(i % 2 ? '♯' : '♭', -60 + i * 45 + Math.sin(a) * 8, -165 - ((p.ph * 18 + i * 11) % 30)); }
+  if (p.flash > 0) { ctx.globalAlpha = Math.min(1, p.flash * 6); ctx.fillStyle = '#fff'; rr(-114, -98, 228, 40, 8); ctx.fill(); ctx.globalAlpha = 1; }
+  ctx.restore();
+}
+
+function drawPianist(p, run) {
+  const t = p.ph * (run ? 24 : 9), sw = Math.sin(t), wag = Math.sin(p.ph * 14) * 5;
+  ctx.save(); ctx.translate(p.x, p.y); ctx.scale(p.s * (run ? -1 : 1), p.s);   // schaut nach links, auf der Flucht nach rechts
+  ctx.fillStyle = '#0005'; ctx.beginPath(); ctx.ellipse(0, 2, 26, 6, 0, 0, 7); ctx.fill();
+  ctx.lineCap = 'round';
+  // Beine + Lackschuhe
+  ctx.strokeStyle = '#15151a'; ctx.lineWidth = 8;
+  for (const k of [1, -1]) {
+    const fx_ = sw * 13 * k * (run ? 1.6 : 1);
+    ctx.beginPath(); ctx.moveTo(0, -50); ctx.lineTo(fx_, -5); ctx.stroke();
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(fx_ - 5, -3, 9, 4, 0, 0, 7); ctx.fill();
+  }
+  // Frackschösse
+  ctx.fillStyle = '#15151a'; ctx.beginPath(); ctx.moveTo(2, -62); ctx.lineTo(24 + sw * 4, -30); ctx.lineTo(13, -34); ctx.lineTo(10, -56); ctx.fill();
+  // Notenmappe unter dem hinteren Arm
+  ctx.fillStyle = '#f5f1e6'; ctx.save(); ctx.translate(12, -70); ctx.rotate(0.3); ctx.fillRect(-7, -10, 15, 20);
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(-5, -6 + i * 4); ctx.lineTo(6, -6 + i * 4); ctx.stroke(); } ctx.restore();
+  // Frack, Hemdbrust, Fliege
+  ctx.fillStyle = '#15151a'; rr(-14, -92, 28, 46, 9); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-14, -86); ctx.lineTo(-3, -90); ctx.lineTo(-9, -60); ctx.lineTo(-14, -62); ctx.fill();
+  ctx.fillStyle = '#c1121f'; ctx.beginPath(); ctx.moveTo(-9, -87); ctx.lineTo(-16, -92); ctx.lineTo(-16, -82); ctx.closePath(); ctx.moveTo(-9, -87); ctx.lineTo(-2, -92); ctx.lineTo(-2, -82); ctx.fill();
+  // erhobener Zeigefinger
+  ctx.strokeStyle = '#15151a'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(-8, -82); ctx.lineTo(-27, -90); ctx.lineTo(-30 + wag * 0.4, -112); ctx.stroke();
+  ctx.strokeStyle = '#f1c9a5'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-30 + wag * 0.4, -114); ctx.lineTo(-31 + wag, -126); ctx.stroke();
+  // Kopf: Nase hoch, wilde graue Mähne
+  ctx.fillStyle = '#c9c9d2';
+  for (const [hx, hy, hr] of [[8, -112, 9], [12, -102, 8], [2, -118, 8], [-6, -118, 6], [13, -93, 6]]) { ctx.beginPath(); ctx.arc(hx, hy + Math.sin(t + hx) * 0.8, hr, 0, 7); ctx.fill(); }
+  ctx.fillStyle = '#f1c9a5'; ctx.beginPath(); ctx.arc(-2, -104, 12, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-12, -108); ctx.lineTo(-22, -111); ctx.lineTo(-13, -101); ctx.fill();
+  ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-12, -113); ctx.lineTo(-3, -109); ctx.stroke();               // strenge Braue
+  ctx.beginPath(); ctx.arc(-7, -105, 2.5, 0.2, 2.9); ctx.stroke();                          // halb geschlossenes Auge
+  if (p.nagShow > 0) { ctx.fillStyle = '#5a1a1a'; ctx.beginPath(); ctx.ellipse(-9, -97, 4, 2 + Math.abs(Math.sin(p.ph * 18)) * 3, 0, 0, 7); ctx.fill(); }
+  else { ctx.beginPath(); ctx.moveTo(-13, -96); ctx.lineTo(-5, -97); ctx.stroke(); }
+  if (p.flash > 0) { ctx.globalAlpha = Math.min(1, p.flash * 6); ctx.fillStyle = '#fff'; rr(-18, -124, 36, 122, 10); ctx.fill(); ctx.globalAlpha = 1; }
+  ctx.lineCap = 'butt';
+  ctx.restore();
+  // Sprechblase
+  if (p.nagShow > 0 && p.nag) {
+    const fs = SMALL ? 21 : 12;
+    ctx.font = '700 ' + fs + 'px system-ui'; ctx.textAlign = 'center';
+    const tw = ctx.measureText(p.nag).width + 16, by = p.y - 150 * p.s, bx = clamp(p.x - 10, 96 + tw / 2, W - tw / 2 - 4);
+    ctx.globalAlpha = Math.min(1, p.nagShow * 4);
+    ctx.fillStyle = '#fff'; rr(bx - tw / 2, by - fs - 3, tw, fs + 10, 8); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(bx - 6, by + 6); ctx.lineTo(bx + 6, by + 6); ctx.lineTo(p.x - 6 * p.s, by + 16); ctx.fill();
+    ctx.fillStyle = '#1b1b1b'; ctx.fillText(p.nag, bx, by);
+    ctx.globalAlpha = 1;
+  }
+  if (p.hp < p.maxHp) {
+    const w = 36 * p.s, x = p.x - w / 2, y = p.y - 172 * p.s;
+    ctx.fillStyle = '#000a'; ctx.fillRect(x - 1, y - 1, w + 2, 7);
+    ctx.fillStyle = '#e63946'; ctx.fillRect(x, y, w * Math.max(0, p.hp / p.maxHp), 5);
+  }
+}
+
+function drawCembalo(p) {
+  const T = p.T, wob = Math.sin(p.ph * 9) * 0.02;
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(wob);
+  ctx.fillStyle = '#0005'; ctx.beginPath(); ctx.ellipse(0, 4, 120, 10, 0, 0, 7); ctx.fill();
+  // dünne gedrechselte Beine, eines davon schief
+  ctx.strokeStyle = T.dark; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  for (const [x, k] of [[-96, 0], [-40, -6], [30, 4], [96, 0]]) {
+    ctx.beginPath(); ctx.moveTo(x, -66); ctx.lineTo(x + k, -4); ctx.stroke();
+    ctx.fillStyle = T.dark; ctx.beginPath(); ctx.arc(x + k * 0.5, -36, 6, 0, 7); ctx.arc(x + k, -4, 5, 0, 7); ctx.fill();
+  }
+  ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-96, -24); ctx.lineTo(96, -24); ctx.stroke(); ctx.lineCap = 'butt';
+  // aufgeklappter Deckel mit verblasstem Gemälde
+  ctx.fillStyle = T.dark; ctx.beginPath(); ctx.moveTo(110, -98); ctx.lineTo(-70, -168); ctx.lineTo(-76, -160); ctx.lineTo(104, -92); ctx.fill();
+  ctx.fillStyle = '#6f8f86'; ctx.beginPath(); ctx.moveTo(108, -96); ctx.lineTo(-66, -163); ctx.lineTo(-30, -98); ctx.fill();
+  ctx.strokeStyle = '#c9a22799'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, -112, 12, 0, 7); ctx.moveTo(30, -104); ctx.quadraticCurveTo(50, -120, 70, -104); ctx.stroke();
+  ctx.strokeStyle = T.dark; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(40, -96); ctx.lineTo(10, -134); ctx.stroke(); // Deckelstütze
+  // schmaler Korpus
+  ctx.fillStyle = T.body; ctx.beginPath(); ctx.moveTo(-112, -98); ctx.lineTo(110, -98); ctx.lineTo(110, -74); ctx.lineTo(-70, -64); ctx.lineTo(-112, -64); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#c9a22788'; ctx.lineWidth = 1.5; ctx.strokeRect(-60, -93, 160, 14);
+  // zwei Manuale mit vertauschten Tastenfarben
+  for (let row = 0; row < 2; row++) {
+    const y = -92 + row * 13, x0 = -110 + row * 4;
+    ctx.fillStyle = '#1a1a1a'; ctx.fillRect(x0, y, 44, 10);
+    ctx.fillStyle = '#e8dfc4'; for (let i = 0; i < 7; i++) if (i % 7 !== 2 && i % 7 !== 6) ctx.fillRect(x0 + 3 + i * 6, y, 3, 6);
+    ctx.strokeStyle = '#555'; ctx.lineWidth = 0.5; for (let i = 1; i < 7; i++) { ctx.beginPath(); ctx.moveTo(x0 + i * 6.3, y); ctx.lineTo(x0 + i * 6.3, y + 10); ctx.stroke(); }
+  }
+  // müde Augen + Jahreszahl
+  for (const x of [-46, -22]) {
+    ctx.fillStyle = '#f0e6b8'; ctx.beginPath(); ctx.ellipse(x, -80, 8, 6, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#3a2a10'; ctx.beginPath(); ctx.arc(x - 2, -78, 3, 0, 7); ctx.fill();
+    ctx.fillStyle = T.body; ctx.fillRect(x - 9, -87, 18, 5 + Math.sin(p.ph * 2) * 1.5); // schweres Augenlid
+  }
+  ctx.fillStyle = '#3a2a10'; ctx.font = 'italic 700 11px Georgia, serif'; ctx.textAlign = 'center'; ctx.fillText('Anno 1723', 50, -82);
+  // Staubschicht + Spinnweben
+  ctx.fillStyle = '#cfc7b099';
+  for (const s of p.spots) { ctx.beginPath(); ctx.ellipse(s[0] * 2.2, -99, s[2] * 1.6, 3.5, 0, 0, 7); ctx.fill(); }
+  ctx.strokeStyle = '#ffffffaa'; ctx.lineWidth = 1;
+  for (const [cx, cy, dir] of [[110, -98, -1], [-96, -64, 1]]) {
+    for (let i = 0; i < 4; i++) { const a = dir > 0 ? 0.2 + i * 0.4 : Math.PI - 0.5 - i * 0.35; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * 44, cy + Math.abs(Math.sin(a)) * 44 * (dir > 0 ? 1 : -1)); ctx.stroke(); }
+    for (const r of [16, 30]) { ctx.beginPath(); if (dir > 0) ctx.arc(cx, cy, r, 0.2, 1.4); else ctx.arc(cx, cy, r, Math.PI + 0.5, Math.PI + 1.55); ctx.stroke(); }
+  }
+  if (p.flash > 0) { ctx.globalAlpha = Math.min(1, p.flash * 6); ctx.fillStyle = '#fff'; ctx.fillRect(-112, -98, 222, 34); ctx.globalAlpha = 1; }
+  ctx.restore();
+}
+
+function drawRoller(r) {
+  const L = LANES[r.lane];
+  ctx.save(); ctx.translate(r.x, L.y); ctx.scale(L.s, L.s);
+  ctx.fillStyle = '#0005'; ctx.beginPath(); ctx.ellipse(0, 3, 80, 8, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#f2b705'; rr(-62, -62, 84, 34, 5); ctx.fill();                 // Motorhaube
+  ctx.fillStyle = '#d99a00'; rr(-66, -100, 46, 44, 4); ctx.fill();               // Kabine
+  ctx.fillStyle = '#bfe6ff'; ctx.fillRect(-58, -93, 30, 20);
+  ctx.fillStyle = '#333'; ctx.fillRect(4, -86, 8, 26);                           // Kamin
+  ctx.fillStyle = '#ffffff66'; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(2 - i * 14, -96 - i * 10 + Math.sin(r.x * 0.05 + i) * 3, 7 + i * 3, 0, 7); ctx.fill(); }
+  ctx.fillStyle = '#2b2b33'; ctx.beginPath(); ctx.arc(-44, -22, 22, 0, 7); ctx.fill(); // Hinterrad
+  ctx.fillStyle = '#777'; ctx.beginPath(); ctx.arc(-44, -22, 8, 0, 7); ctx.fill();
+  ctx.fillStyle = '#6c6f7a'; ctx.beginPath(); ctx.arc(42, -30, 30, 0, 7); ctx.fill();  // Walze
+  ctx.strokeStyle = '#3d4049'; ctx.lineWidth = 3;
+  for (let i = 0; i < 4; i++) { const a = r.x * 0.033 + i * 0.785; ctx.beginPath(); ctx.moveTo(42 + Math.cos(a) * 30, -30 + Math.sin(a) * 30); ctx.lineTo(42 - Math.cos(a) * 30, -30 - Math.sin(a) * 30); ctx.stroke(); }
+  ctx.fillStyle = '#1b1b1b'; ctx.font = '800 9px system-ui'; ctx.textAlign = 'center'; ctx.fillText(CONFIG.firma.toUpperCase(), -20, -42, 76);
+  ctx.restore();
+}
+
+function drawCrane() {
+  const active = tool === 'crane';
+  ctx.fillStyle = '#e0a100'; ctx.fillRect(96, 58, W - 96, 9);
+  ctx.fillStyle = '#00000030'; for (let x = 100; x < W; x += 26) ctx.fillRect(x, 58, 12, 9);
+  ctx.fillStyle = '#3a3340'; rr(crane.x - 22, 52, 44, 20, 4); ctx.fill();
+  ctx.globalAlpha = active ? 1 : 0.55;
+  const f = crane.fall;
+  let wx = crane.x, wy = 118;
+  const show = cds.crane <= 0 || f;
+  if (f) { wx = f.x; wy = f.y; }
+  if (!f && crane.rest > 0) drawWeight(crane.restAt.x, crane.restAt.y);
+  if (show) {
+    if (!f) { ctx.strokeStyle = '#222'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(crane.x, 70); ctx.lineTo(wx, wy - 36); ctx.stroke(); }
+    drawWeight(wx, wy);
+  } else { ctx.strokeStyle = '#222'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(crane.x, 70); ctx.lineTo(crane.x, 70 + 30 * (1 - cds.crane / TOOLS.crane.cd)); ctx.stroke(); }
+  ctx.globalAlpha = 1;
+}
+function drawWeight(x, y) {
+  ctx.fillStyle = '#2b2b33'; ctx.beginPath(); ctx.moveTo(x - 26, y - 34); ctx.lineTo(x + 26, y - 34); ctx.lineTo(x + 38, y); ctx.lineTo(x - 38, y); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#2b2b33'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(x, y - 36, 7, Math.PI, 0); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.font = '900 17px system-ui'; ctx.textAlign = 'center'; ctx.fillText('1 t', x, y - 10);
+}
+
+function drawAim() { // Zielhilfen je nach Werkzeug
+  if (state !== 'play' || (touch && !mouse.down)) return;
+  ctx.strokeStyle = '#ffb70388'; ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
+  const gy = clamp(mouse.y, 385, 515);
+  if (tool === 'crane' && !crane.fall && cds.crane <= 0) {
+    ctx.beginPath(); ctx.moveTo(crane.x, 124); ctx.lineTo(crane.x, gy); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(crane.x, gy, 50, 9, 0, 0, 7); ctx.stroke();
+  } else if (tool === 'tnt' || tool === 'rock' || tool === 'fall') {
+    const r = TOOLS[tool].radius;
+    ctx.beginPath(); ctx.ellipse(mouse.x, tool === 'fall' ? gy : clamp(mouse.y, 340, 520), r, r * (tool === 'fall' ? 0.25 : 1), 0, 0, 7); ctx.stroke();
+  } else if (tool === 'walze' && !roller && cds.walze <= 0) {
+    const L = LANES[nearestLane(mouse.y)];
+    ctx.fillStyle = '#ffb70318'; ctx.fillRect(92, L.y - 96 * L.s, W - 92, 100 * L.s);
+    ctx.strokeRect(92, L.y - 96 * L.s, W - 92, 100 * L.s);
+  }
+  ctx.setLineDash([]);
+  if (tool === 'saw') {
+    ctx.save(); ctx.translate(mouse.x + (G.sawing ? rnd(-2, 2) : 0), mouse.y + (G.sawing ? rnd(-2, 2) : 0)); ctx.rotate(-0.5);
+    ctx.fillStyle = '#b9bec9'; rr(-4, -7, 62, 14, 7); ctx.fill();
+    ctx.strokeStyle = '#444'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.lineDashOffset = -performance.now() / (G.sawing ? 6 : 60); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#e85d04'; rr(52, -16, 40, 30, 6); ctx.fill();
+    ctx.fillStyle = '#222'; rr(88, -10, 16, 18, 4); ctx.fill();
+    ctx.restore();
+  } else if (tool === 'fork') {
+    ctx.save(); ctx.translate(mouse.x, mouse.y); ctx.rotate(0.5);
+    ctx.strokeStyle = '#dfe6f0'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-6, -4); ctx.lineTo(-6, -34); ctx.moveTo(6, -4); ctx.lineTo(6, -34); ctx.moveTo(-6, -4); ctx.quadraticCurveTo(0, 4, 6, -4); ctx.moveTo(0, 0); ctx.lineTo(0, 30); ctx.stroke();
+    ctx.restore(); ctx.lineCap = 'butt';
+  }
+}
+
+function drawFx() {
+  for (const q of parts) {
+    ctx.globalAlpha = Math.min(1, q.life * 2);
+    if (q.dust) { ctx.globalAlpha *= 0.5; ctx.fillStyle = q.c; ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, 7); ctx.fill(); continue; }
+    ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.fillStyle = q.c; ctx.fillRect(-q.w / 2, -q.h / 2, q.w, q.h); ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  for (const f of fallers) {
+    const k = f.t * f.t;
+    ctx.fillStyle = 'rgba(0,0,0,' + (0.15 + 0.35 * k) + ')'; ctx.beginPath(); ctx.ellipse(f.x, f.ty, 30 + 40 * k, 5 + 6 * k, 0, 0, 7); ctx.fill();
+    drawPiano(Object.assign({}, FAKE, { x: f.x, y: -160 + (f.ty + 160) * k, tilt: f.rot + f.t * 2.5 }));
+  }
+  for (const b of bombs) {
+    const k = Math.min(1, b.t / b.fl), x = b.sx + (b.tx - b.sx) * k, y = b.sy + (b.ty - b.sy) * k - Math.sin(k * Math.PI) * (b.kind === 'rock' ? 240 : 150);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(k < 1 ? b.t * 14 : 0.4);
+    if (b.kind === 'rock') {
+      ctx.fillStyle = '#8d8f98'; ctx.beginPath(); ctx.moveTo(-14, -4); ctx.lineTo(-6, -14); ctx.lineTo(9, -12); ctx.lineTo(15, 2); ctx.lineTo(6, 13); ctx.lineTo(-10, 11); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#6c6e77'; ctx.beginPath(); ctx.arc(3, 2, 5, 0, 7); ctx.fill();
+    } else {
+      ctx.fillStyle = '#d62828'; rr(-5, -16, 10, 32, 2); ctx.fill();
+      ctx.strokeStyle = '#c9a227'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -16); ctx.lineTo(4, -24); ctx.stroke();
+      ctx.fillStyle = Math.sin(b.t * 60) > 0 ? '#fff' : '#ffb703'; ctx.beginPath(); ctx.arc(4, -25, 3.5, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+  }
+  if (elephant) {
+    ctx.font = '150px system-ui'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#0005'; ctx.beginPath(); ctx.ellipse(elephant.x, 515, 95, 12, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#000'; ctx.fillText('🐘', elephant.x, 505 - Math.abs(Math.sin(elephant.x * 0.03)) * 26);
+  }
+  for (const e of fx) {
+    const k = e.t / e.dur;
+    if (e.kind === 'boom') {
+      ctx.globalAlpha = 1 - k;
+      ctx.fillStyle = '#ffb703'; ctx.beginPath(); ctx.arc(e.x, e.y, TOOLS.tnt.radius * (0.3 + k * 0.7), 0, 7); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(e.x, e.y, TOOLS.tnt.radius * 0.5 * (1 - k), 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+    } else if (e.kind === 'star') {
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.globalAlpha = 1 - k;
+      for (let i = 0; i < 8; i++) { const a = i * 0.785; ctx.beginPath(); ctx.moveTo(e.x + Math.cos(a) * 8, e.y + Math.sin(a) * 8); ctx.lineTo(e.x + Math.cos(a) * (14 + k * 22), e.y + Math.sin(a) * (14 + k * 22)); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.save(); ctx.translate(e.x + 48, e.y + 52); ctx.rotate(0.9 - Math.min(1, k * 1.6) * 1.6);
+      if (e.kind === 'bat') {
+        ctx.fillStyle = '#d9a35c'; ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(-8, -78); ctx.quadraticCurveTo(0, -88, 8, -78); ctx.lineTo(3, 0); ctx.fill();
+        ctx.fillStyle = '#333'; ctx.fillRect(-3.5, -14, 7, 16);
+      } else {
+        ctx.fillStyle = '#8a5a2b'; ctx.fillRect(-3.5, -84, 7, 86);
+        ctx.fillStyle = '#555c66'; rr(-24, -100, 48, 26, 4); ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+  ctx.textAlign = 'center';
+  for (const t of texts) {
+    ctx.globalAlpha = Math.min(1, t.life * 2);
+    ctx.font = '900 ' + Math.round(t.size * (SMALL ? 1.6 : 1)) + 'px system-ui';
+    const half = ctx.measureText(t.text).width / 2 + 8, x = clamp(t.x, half, W - half);
+    ctx.lineWidth = 4; ctx.strokeStyle = '#000c'; ctx.strokeText(t.text, x, t.y);
+    ctx.fillStyle = t.color; ctx.fillText(t.text, x, t.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawHUDSmall() {   // Handy hochkant: nur das Wichtigste, dafür gross (Rest steht unter dem Spielfeld)
+  ctx.fillStyle = '#0d0b12cc'; ctx.fillRect(0, 0, W, 58);
+  ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.font = '900 40px system-ui'; ctx.fillText(G.score + ' Pkt', 16, 44);
+  if (G.combo > 1) { ctx.fillStyle = '#ffb703'; ctx.font = '900 32px system-ui'; ctx.textAlign = 'center'; ctx.fillText('KOMBO ×' + G.combo, W / 2 + 40, 43); }
+  ctx.textAlign = 'right'; ctx.font = '34px system-ui';
+  for (let i = 0; i < 3; i++) { ctx.globalAlpha = i < G.lives ? 1 : 0.2; ctx.fillText('❤️', W - 14 - i * 46, 44); }
+  ctx.globalAlpha = 1;
+  const boss = pianos.find(p => p.boss);
+  if (boss) {
+    ctx.fillStyle = '#000a'; rr(W / 2 - 302, 66, 604, 34, 8); ctx.fill();
+    ctx.fillStyle = boss.T.col; rr(W / 2 - 300, 68, 600 * Math.max(0, boss.hp / boss.maxHp), 30, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = '800 20px system-ui'; ctx.textAlign = 'center'; ctx.fillText(boss.T.name.toUpperCase(), W / 2, 90);
+  }
+}
+function drawHUD() {
+  if (SMALL) return drawHUDSmall();
+  ctx.fillStyle = '#0d0b12cc'; ctx.fillRect(0, 0, W, 46);
+  ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.font = '900 24px system-ui';
+  ctx.fillText(G.score + ' Pkt', 16, 31);
+  ctx.font = '600 13px system-ui'; ctx.fillStyle = '#a59fb3';
+  let info = 'Geschrottet: ' + G.kills + '  ·  Gerettet: ' + G.saved;
+  const next = CONFIG.gutscheine[G.coup];
+  info += next ? '  ·  🎟 nächster Gutschein: ' + next.ab : '  ·  🎟 alle Gutscheine!';
+  ctx.fillText(info, 170, 29);
+  if (G.combo > 1) { ctx.fillStyle = '#ffb703'; ctx.font = '900 20px system-ui'; ctx.textAlign = 'center'; ctx.fillText('KOMBO ×' + G.combo, W - 250, 31); }
+  ctx.textAlign = 'right'; ctx.font = '600 13px system-ui'; ctx.fillStyle = '#a59fb3'; ctx.fillText('Nerven:', W - 96, 29);
+  ctx.font = '20px system-ui';
+  for (let i = 0; i < 3; i++) { ctx.globalAlpha = i < G.lives ? 1 : 0.2; ctx.fillText('❤️', W - 14 - i * 26, 32); }
+  ctx.globalAlpha = 1;
+  const boss = pianos.find(p => p.boss);
+  if (boss) {
+    ctx.fillStyle = '#000a'; rr(W / 2 - 202, 78, 404, 20, 6); ctx.fill();
+    ctx.fillStyle = boss.T.col; rr(W / 2 - 200, 80, 400 * Math.max(0, boss.hp / boss.maxHp), 16, 5); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = '800 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText(boss.T.name.toUpperCase(), W / 2, 92);
+  }
+}
+
+function drawTune() {
+  ctx.fillStyle = '#0d0b12c0'; ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  if (SMALL) { ctx.translate(W / 2, 270); ctx.scale(1.7, 1.7); ctx.translate(-W / 2, -270); }
+  const x = W / 2 - 270, y = 150, w = 540, h = 240;
+  ctx.fillStyle = '#fffaf0'; rr(x, y, w, h, 14); ctx.fill();
+  ctx.fillStyle = '#b3261e'; rr(x, y, w, 10, [14, 14, 0, 0]); ctx.fill();
+  ctx.textAlign = 'center'; ctx.fillStyle = '#1b1b1b'; ctx.font = '900 24px system-ui';
+  ctx.fillText('Stimmen statt Schrotten – Saite ' + (TU.step + 1) + ' von 3', W / 2, y + 48);
+  ctx.font = '500 14px system-ui'; ctx.fillStyle = '#444';
+  ctx.fillText((touch ? 'Tippe' : 'Klick oder Leertaste') + ', wenn der Zeiger im grünen Bereich ist (die Schwebung verschwindet).', W / 2, y + 74, w - 30);
+  const gx = W / 2 - 210, gw = 420, gy = y + 120, z = TUNE_ZONE[TU.step];
+  ctx.fillStyle = '#e63946'; rr(gx, gy, gw, 34, 8); ctx.fill();
+  ctx.fillStyle = '#f4a261'; ctx.fillRect(W / 2 - gw * z, gy, gw * z * 2, 34);
+  ctx.fillStyle = '#2a9d8f'; ctx.fillRect(W / 2 - gw / 2 * z, gy, gw * z, 34);
+  ctx.fillStyle = '#1b1b1b'; ctx.font = '700 12px system-ui';
+  ctx.fillText('zu tief ♭', gx + 40, gy + 54); ctx.fillText('zu hoch ♯', gx + gw - 40, gy + 54); ctx.fillText('442 Hz ✓', W / 2, gy + 54);
+  const nx = W / 2 + TU.pos * gw / 2;
+  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.moveTo(nx, gy + 38); ctx.lineTo(nx - 9, gy - 14); ctx.lineTo(nx + 9, gy - 14); ctx.fill();
+  for (let i = 0; i < 3; i++) { ctx.fillStyle = i < TU.step ? '#2a9d8f' : '#ccc'; ctx.beginPath(); ctx.arc(W / 2 - 30 + i * 30, y + 205, 9, 0, 7); ctx.fill(); }
+  ctx.fillStyle = '#888'; ctx.font = 'italic 12px system-ui'; ctx.fillText('So macht es ' + CONFIG.firma + ' – nur ohne Zeitdruck.', W / 2, y + 230);
+  ctx.restore();
+}
+
+function render(time) {
+  SMALL = cv.clientWidth > 0 && cv.clientWidth < 560;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.save();
+  if (G.shake > 0) ctx.translate(rnd(-1, 1) * G.shake, rnd(-1, 1) * G.shake);
+  drawBackground(time);
+  const items = pianos.map(p => ({ y: p.y, f: () => drawPiano(p) }));
+  for (const r of runners) items.push({ y: r.y, f: () => drawPianist(r, true) });
+  if (roller) items.push({ y: LANES[roller.lane].y + 1, f: () => drawRoller(roller) });
+  items.sort((a, b) => a.y - b.y).forEach(i => i.f());
+  drawHall();
+  drawCrane();
+  drawFx();
+  drawAim();
+  ctx.restore();
+  if (G.flash > 0) { ctx.fillStyle = 'rgba(230,57,70,' + G.flash + ')'; ctx.fillRect(0, 0, W, H); }
+  drawHUD();
+  if (state === 'tune' && TU) drawTune();
+}
+
+/* ---------- Toolbar / Eingabe ---------- */
+const toolsEl = $('tools');
+for (const t of TOOLDEF) {
+  const b = document.createElement('button'); b.className = 'tool' + (t.id === tool ? ' sel' : ''); b.dataset.tool = t.id;
+  b.innerHTML = '<span class="ico">' + t.ico + '</span><span class="nm">' + t.nm + (t.id === 'tnt' ? ' <span id="tntN"></span>' : '') + '</span><span class="inf">[' + t.key + '] ' + t.inf + '</span><i class="cd"></i>';
+  b.addEventListener('click', () => selectTool(t.id));
+  toolsEl.append(b);
+}
+const toolBtns = [...document.querySelectorAll('.tool')];
+let statusText = '';
+function selectTool(t) { tool = t; toolBtns.forEach(b => b.classList.toggle('sel', b.dataset.tool === t)); SND.klick(); }
+function updateToolbar() {
+  for (const b of toolBtns) {
+    const t = b.dataset.tool;
+    const k = t === 'elefant' ? G.ele / ELE_NEED : cds[t] / TOOLS[t].cd;
+    b.querySelector('.cd').style.width = (clamp(k, 0, 1) * 100) + '%';
+    b.classList.toggle('off', (t === 'elefant' && G.ele < ELE_NEED) || (t === 'tnt' && G.tnt <= 0));
+  }
+  $('tntN').textContent = '×' + G.tnt;
+  const next = CONFIG.gutscheine[G.coup];
+  const st = 'Geschrottet: ' + G.kills + ' · Gerettet: ' + G.saved + ' · 🎟 ' + (next ? 'nächster Gutschein ab ' + next.ab : 'alle Gutscheine!');
+  if (st !== statusText) $('status').textContent = statusText = st;
+  cv.style.cursor = (tool === 'saw' || tool === 'fork') && state === 'play' ? 'none' : 'crosshair';
+  if (sawGain) {
+    const on = state === 'play' && G.sawing && !muted;
+    sawGain.gain.value = on ? 0.06 : 0;
+    sawOsc.frequency.value = G.sawing && G.sawing !== true ? 150 + Math.random() * 30 : 95;
+  }
+}
+$('mute').addEventListener('click', () => { muted = !muted; $('mute').textContent = muted ? '🔇 Ton aus' : '🔊 Ton'; });
+// Vollbild (auf Android zusätzlich Querformat sperren; iPhone-Safari kann kein Vollbild, dort wird der Knopf versteckt)
+const rootEl = document.documentElement;
+if (!rootEl.requestFullscreen) $('fs').style.display = 'none';
+$('fs').addEventListener('click', async () => {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else { await rootEl.requestFullscreen(); if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); }
+  } catch (e) {}
+});
+cv.addEventListener('contextmenu', e => e.preventDefault());   // kein Menü beim langen Drücken (Kettensäge)
+function pos(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; }
+cv.addEventListener('pointermove', e => Object.assign(mouse, pos(e)));
+cv.addEventListener('pointerdown', e => {
+  e.preventDefault(); audio();
+  touch = e.pointerType !== 'mouse';
+  try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+  const p = pos(e); Object.assign(mouse, p); mouse.down = true;
+  if (state === 'tune') return tuneHit();
+  if (tool === 'crane') crane.x = clamp(p.x, 110, W - 40);
+  use(p.x, p.y);
+});
+for (const ev of ['pointerup', 'pointercancel', 'blur']) addEventListener(ev, () => mouse.down = false);
+addEventListener('keydown', e => {
+  if (state === 'tune') { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); tuneHit(); } return; }
+  const t = TOOLDEF.find(d => d.key === e.key);
+  if (t) selectTool(t.id);
+  if ((e.key === 'Enter' || e.key === ' ') && state !== 'play' && !(state === 'over' && $('over').classList.contains('hidden'))) { e.preventDefault(); start(); }
+});
+$('startBtn').addEventListener('click', start);
+$('againBtn').addEventListener('click', start);
+
+/* ---------- Loop ---------- */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (state === 'play') update(dt);
+  else {
+    G.shake = Math.max(0, G.shake - dt * 40); G.flash = Math.max(0, G.flash - dt); G.sawing = null;
+    if (state === 'tune' && TU) updateTune(dt);
+  }
+  if (state !== 'tune') updateFx(dt);
+  render(now / 1000);
+  updateToolbar();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
