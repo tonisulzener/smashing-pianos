@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14121a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Smashing Pianos 3D">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<title>Smashing Pianos 3D</title>
+<style>
+  :root { --panel:#221f2bd9; --ink:#f4efe6; --mut:#a59fb3; --acc:#ffb703; --red:#e63946; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:#14121a; color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; overflow:hidden;
+              overscroll-behavior:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
+  button { touch-action:manipulation; font:inherit; }
+  #app { position:fixed; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; cursor:crosshair; }
+  #hud { position:absolute; left:0; right:0; top:0; display:flex; align-items:center; gap:14px; pointer-events:none;
+         padding:calc(6px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) 6px calc(12px + env(safe-area-inset-left));
+         background:linear-gradient(#0d0b12d0, #0d0b1200); }
+  #score { font-size:clamp(20px,4vw,28px); font-weight:900; white-space:nowrap; }
+  #info { font-size:12px; color:#d8d2e2; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #combo { font-size:clamp(15px,3vw,20px); font-weight:900; color:var(--acc); white-space:nowrap; }
+  #lives { font-size:clamp(17px,3.4vw,22px); white-space:nowrap; }
+  #lives span.lost { opacity:.2; }
+  #texts { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  .ft { position:absolute; transform:translate(-50%,-50%); font-weight:900; white-space:nowrap; text-shadow:0 2px 0 #000, 0 0 6px #000, 0 0 2px #000; animation:rise 1.5s ease-out forwards; }
+  .ft.long { animation-duration:3s; }
+  @keyframes rise { 0% { opacity:0; margin-top:8px; } 12% { opacity:1; } 70% { opacity:1; } 100% { opacity:0; margin-top:-70px; } }
+  #flash { position:absolute; inset:0; background:var(--red); opacity:0; pointer-events:none; transition:opacity .35s; }
+  #tools { position:absolute; left:0; right:0; bottom:0; display:flex; justify-content:center; gap:6px;
+           padding:6px calc(6px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left)); }
+  .tool { position:relative; overflow:hidden; flex:1; max-width:98px; min-width:0; color:var(--ink); background:var(--panel); border:2px solid #4a4459; border-radius:10px; padding:6px 2px 7px; cursor:pointer; text-align:center; }
+  .tool .ico { font-size:24px; line-height:1; display:block; }
+  .tool .nm { font-size:11px; font-weight:800; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tool.sel { border-color:var(--acc); background:#4a3a2ae6; }
+  .tool.off .ico, .tool.off .nm { opacity:.45; }
+  .tool .cd { position:absolute; left:0; bottom:0; height:4px; background:var(--acc); width:0; }
+  #mute { pointer-events:auto; flex:none; width:40px; height:36px; padding:0; color:var(--ink); background:var(--panel); border:2px solid #4a4459; border-radius:10px; font-size:17px; cursor:pointer; }
+  .overlay { position:absolute; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; text-align:center; background:#0d0b12f2; padding:20px 18px; gap:10px; overflow-y:auto; }
+  .overlay > :first-child { margin-top:auto; } .overlay > :last-child { margin-bottom:auto; }
+  .overlay.hidden { display:none; }
+  h1 { margin:0; font-size:clamp(30px,7vw,64px); font-weight:900; color:var(--acc); text-shadow:0 4px 0 #b3261e, 0 8px 18px #000; transform:rotate(-2deg); }
+  h1 small { display:inline-block; font-size:.5em; color:#fff; background:var(--red); border-radius:8px; padding:0 .35em; vertical-align:middle; text-shadow:none; }
+  h2 { margin:0; font-size:clamp(22px,4.4vw,38px); color:var(--acc); }
+  .versions { margin:0; display:inline-flex; border:2px solid var(--acc); border-radius:999px; overflow:hidden; font-weight:800; font-size:15px; flex:none; }
+  .versions a, .versions span { padding:.3em 1.2em; text-decoration:none; color:var(--acc); }
+  .versions span { background:var(--acc); color:#1b1b1b; }
+  .sub { color:var(--mut); font-size:clamp(12px,1.9vw,16px); margin:0; }
+  .rules { font-size:clamp(12.5px,1.8vw,15px); line-height:1.5; max-width:640px; margin:0; color:#fff; }
+  .rules b { color:var(--acc); }
+  .big { font-size:clamp(20px,4vw,36px); font-weight:800; margin:0; }
+  button.go { font-weight:800; font-size:clamp(16px,2.4vw,21px); padding:.55em 1.6em; border:0; border-radius:999px; background:var(--red); color:#fff; cursor:pointer; box-shadow:0 5px 0 #8f1d27; flex:none; }
+  button.go:active { transform:translateY(3px); box-shadow:0 2px 0 #8f1d27; }
+  .ad { background:#fff; color:#1b1b1b; border-radius:10px; padding:.6em 1.1em; max-width:600px; width:100%; font-size:clamp(12.5px,1.75vw,14.5px); box-shadow:0 4px 0 var(--acc); }
+  .ad strong.firma { display:block; font-size:1.3em; }
+  .ad a, .presented a { color:#b3261e; font-weight:700; }
+  .presented a { color:var(--acc); }
+  .coupons { list-style:none; margin:.5em 0 0; padding:.5em 0 0; border-top:2px dashed #c9a227; text-align:left; }
+  .coupons li { display:flex; justify-content:space-between; gap:.8em; padding:.12em 0; }
+  .coupons li.locked { color:#8a8a8a; }
+  .coupons code { background:#ffe9a3; border:1px dashed #b3261e; border-radius:4px; padding:0 .45em; font-weight:800; white-space:nowrap; }
+  .coupons .hint { display:block; text-align:center; color:#666; font-size:.9em; margin-top:.3em; }
+  .hs { background:#221f2b; border:2px solid #3a3547; border-radius:10px; padding:.6em 1em; max-width:600px; width:100%; font-size:clamp(12px,1.75vw,14.5px); text-align:left; color:#f4efe6; }
+  .hs form { display:flex; gap:6px; margin:.4em 0; }
+  .hs input { flex:1; min-width:0; font:inherit; padding:.35em .6em; border-radius:8px; border:2px solid #4a4459; background:#14121a; color:#fff; -webkit-user-select:text; user-select:text; }
+  .hs form button { font:inherit; font-weight:800; padding:.35em .9em; border:0; border-radius:8px; background:var(--acc); color:#1b1b1b; cursor:pointer; }
+  .hs ol { margin:.3em 0 0; padding-left:1.9em; columns:2; column-gap:2em; }
+  .hs li { break-inside:avoid; } .hs li span { float:right; font-variant-numeric:tabular-nums; }
+  .hs li.me { color:var(--acc); font-weight:800; }
+  .hs small { color:#a59fb3; display:block; margin-top:.3em; }
+  .presented { font-size:13px; color:var(--mut); margin:0; }
+  .presented b { color:var(--ink); }
+  #boss { position:absolute; left:50%; top:calc(48px + env(safe-area-inset-top)); transform:translateX(-50%); width:min(72vw,440px); height:22px; background:#000a; border-radius:7px; overflow:hidden; display:none; pointer-events:none; }
+  #boss i { position:absolute; left:0; top:0; bottom:0; width:100%; }
+  #boss span { position:relative; display:block; text-align:center; font-size:11.5px; font-weight:800; line-height:22px; text-shadow:0 1px 2px #000; }
+  #tune { position:absolute; inset:0; z-index:9; display:none; align-items:center; justify-content:center; background:#0d0b12c0; touch-action:none; cursor:pointer; }
+  #tune.on { display:flex; }
+  #tune .panel { background:#fffaf0; color:#1b1b1b; border-radius:14px; border-top:10px solid #b3261e; padding:14px 18px 12px; width:min(92vw,540px); text-align:center; }
+  #tune h3 { margin:0 0 4px; font-size:clamp(16px,3.6vw,22px); }
+  #tune p { margin:0 0 12px; font-size:13px; color:#444; }
+  #gauge { position:relative; height:38px; border-radius:8px; background:#e63946; overflow:hidden; }
+  #gauge .o, #gauge .g { position:absolute; top:0; bottom:0; left:50%; transform:translateX(-50%); }
+  #gauge .o { background:#f4a261; } #gauge .g { background:#2a9d8f; }
+  #needle { position:absolute; top:0; bottom:0; width:6px; margin-left:-3px; background:#111; border-radius:3px; }
+  #tune .lbl { display:flex; justify-content:space-between; font-size:12px; font-weight:700; margin-top:4px; }
+  #dots { margin-top:8px; } #dots i { display:inline-block; width:16px; height:16px; border-radius:50%; background:#ccc; margin:0 5px; } #dots i.ok { background:#2a9d8f; }
+  #tune small { display:block; color:#888; font-style:italic; margin-top:6px; }
+  @media (max-height:520px) { .tool { padding:3px 2px 5px; } .tool .ico { font-size:20px; } h1 { font-size:34px; } .overlay { padding:10px 18px; gap:6px; } }
+  @media (max-width:900px) { .tool .nm { font-size:10px; letter-spacing:-.02em; } #tools { gap:4px; } }
+  @media (max-width:520px) { #info { display:none; } #hud { justify-content:space-between; } }
+  /* hochkant: Werkzeuge in zwei Reihen zu fünf */
+  @media (max-width:760px) and (orientation:portrait) {
+    #tools { display:grid; grid-template-columns:repeat(6,1fr); gap:4px; }
+    #tools .tool:last-child { grid-column:span 2; }
+    .tool { max-width:none; padding:7px 1px 8px; } .tool .ico { font-size:25px; } .tool .nm { font-size:10px; letter-spacing:-.02em; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="c"></canvas>
+  <div id="texts"></div>
+  <div id="flash"></div>
+  <div id="hud"><div id="score">0 Pkt</div><div id="info"></div><div id="combo"></div><div id="lives"></div></div>
+  <div id="boss"><i></i><span></span></div>
+  <div id="tools"></div>
+  <div id="tune"><div class="panel">
+    <h3 id="tuneTitle"></h3>
+    <p id="tuneHint"></p>
+    <div id="gauge"><div class="o"></div><div class="g"></div><div id="needle"></div></div>
+    <div class="lbl"><span>zu tief ♭</span><span>442 Hz ✓</span><span>zu hoch ♯</span></div>
+    <div id="dots"><i></i><i></i><i></i></div>
+    <small>So macht es <span class="firma"></span> – nur ohne Zeitdruck.</small>
+  </div></div>
+
+  <div id="menu" class="overlay">
+    <h1>SMASHING PIANOS <small>3D</small></h1>
+    <p class="sub">Das Spiel für Klavierstimmer und Klavierspieler mit Nerven am Ende</p>
+    <p class="versions"><a href="../index.html">2D</a><span>3D</span></p>
+    <p class="rules">
+      Verstimmte, verschimmelte und abgesoffene Klaviere rollen die Strasse herunter zum <b>Konzertsaal</b>. Mach sie platt, bevor sie ankommen!<br>
+      <b>Achtung:</b> Glänzende, frisch gestimmte Klaviere mit dem goldenen ✓ lässt du durch.<br>
+      <b>Profi-Tipp:</b> Mit der Stimmgabel 🎵 rettest du verstimmte Klaviere – das gibt Extrapunkte.
+    </p>
+    <p class="rules" id="teaser"></p>
+    <p class="presented" id="loadErr" style="display:none;color:#ff6b6b">Die 3D-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen und neu laden.</p>
+    <button class="go" id="startBtn">Los geht's!</button>
+    <p class="presented">präsentiert von <b class="firma"></b> – <span class="slogan"></span></p>
+  </div>
+
+  <div id="over" class="overlay hidden">
+    <h2>Feierabend!</h2>
+    <p class="big"><span id="finalScore">0</span> Punkte</p>
+    <p class="sub"><span id="finalKills">0</span> geschrottet · <span id="finalSaved">0</span> gerettet · <span id="finalShooed">0</span> Nörgler verjagt · Rang: <b id="rank"></b> · Rekord: <span id="best">0</span></p>
+    <div class="ad">
+      <span id="adLine"></span>
+      <strong class="firma"></strong>
+      <span class="slogan"></span>
+      <span id="contact"></span>
+      <ul class="coupons" id="coupons"></ul>
+    </div>
+      <div class="hs" id="hs" style="display:none">
+        <b>🏆 Rangliste</b>
+        <form id="hsForm"><input id="hsName" maxlength="16" placeholder="Dein Spitzname" autocomplete="off" enterkeyhint="send"><button type="submit">Eintragen</button></form>
+        <ol id="hsList"></ol>
+        <small id="hsMsg"></small>
+      </div>
+    <button class="go" id="againBtn">Nochmal!</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============================================================
+   WERBUNG & GUTSCHEINE: Hier anpassen (gleich wie in der 2D-Version).
+   ============================================================ */
+const CONFIG = {
+  firma:   'Pianos Sulzener',
+  slogan:  'Klavierbau',
+  telefon: '',
+  web:     'https://www.pianosulzener.ch',
+  social:  '',
+  plakat: [
+    'Besuchen Sie unseren Online-Shop!',
+    'Kaffee in der Werkstatt? Sie sind herzlich eingeladen.',
+    'Folgen Sie uns auf Social Media!',
+    'Alles über uns auf unserer Webseite.',
+    'Verstimmt? Wir retten es, bevor es knallt.',
+    'Stimmen statt Schrotten.',
+    'Ihr Klavier hat Besseres verdient.',
+    'Trockene Luft? Ein Venta rettet Klaviere.'
+  ],
+  gutscheine: [
+    { ab: 2500,  titel: '10% Rabatt auf einen Venta',      code: 'VENTA10' },
+    { ab: 6000,  titel: '15% Rabatt auf eine Klavierbank', code: 'BANK15' },
+    { ab: 10000, titel: '10% auf die nächste Stimmung',    code: 'STIMMUNG10' }
+  ],
+  highscore: { url: 'https://zeecomhamqofjgnshovr.supabase.co', key: 'sb_publishable_37lWs5m90CUacUe6nNvnUQ_5lyiUGMJ' },   // Supabase: Projekt-URL und öffentlicher Schlüssel (leer = Rangliste aus)
+  gutscheinHinweis: 'Code bei Pianos Sulzener nennen und einlösen.'
+};
+
+const $ = id => document.getElementById(id);
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+document.querySelectorAll('.firma').forEach(e => e.textContent = CONFIG.firma);
+document.querySelectorAll('.slogan').forEach(e => e.textContent = CONFIG.slogan);
+$('teaser').innerHTML = '🎟 <b>Echte Gutscheine</b> ab ' + CONFIG.gutscheine[0].ab + ' Punkten – einlösbar bei ' + CONFIG.firma + '!';
+const webShort = CONFIG.web.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+if (!window.THREE) { $('loadErr').style.display = ''; $('startBtn').disabled = true; throw new Error('three.js nicht geladen'); }
+
+/* ---------- Spielwerte ---------- */
+const LANES = [-4.5, 0, 4.5], Z_SPAWN = -64, Z_DOOR = 4.5, ELE_NEED = 15, BOSS_EVERY = 12, NAG_COST = 25;
+const TYPES = {
+  verstimmt: { hp: 4, pts: 100, speed: 1.0, body: 0x7a4a2a, dark: 0x57331b },
+  wasser:    { hp: 5, pts: 150, speed: 1.3, body: 0x4d6076, dark: 0x35465a },
+  schimmel:  { hp: 8, pts: 250, speed: 0.8, body: 0x66713c, dark: 0x454e25 },
+  gut:       { hp: 2, pts: 250, speed: 1.1, body: 0x17171b, dark: 0x050505, good: true },
+  pianist:   { hp: 3, pts: 200, speed: 1.2, body: 0x15151a, dark: 0x000000, person: true },
+  boss:      { name: 'Konzertflügel des Grauens', hp: 65, pts: 2000, speed: 0.5, body: 0x2a1830, dark: 0x120a16, boss: true, col: '#9d4edd' },
+  cembalo:   { name: 'Das verstaubte Cembalo',    hp: 42, pts: 1500, speed: 0.8, body: 0x8f7d4e, dark: 0x5c4f2c, boss: true, col: '#b9a56a' }
+};
+const TOOLDEF = [
+  { id: 'bat',     key: '1', ico: '🏏', nm: 'Schläger',   dmg: 1,  cd: 0.13 },
+  { id: 'hammer',  key: '2', ico: '🔨', nm: 'Hammer',     dmg: 3,  cd: 0.6 },
+  { id: 'saw',     key: '3', ico: '🪚', nm: 'Kettensäge', dmg: 7,  cd: 0.01 },
+  { id: 'crane',   key: '4', ico: '🏗️', nm: 'Kran',       dmg: 99, cd: 3.2, radius: 3.2 },
+  { id: 'rock',    key: '5', ico: '🪨', nm: 'Katapult',   dmg: 4,  cd: 1.3, radius: 2.6 },
+  { id: 'tnt',     key: '6', ico: '🧨', nm: 'Dynamit',    dmg: 6,  cd: 0.5, radius: 5.5 },
+  { id: 'fall',    key: '7', ico: '🎹', nm: '5. Stock',   dmg: 6,  cd: 4,   radius: 3.6 },
+  { id: 'walze',   key: '8', ico: '🚜', nm: 'Walze',      dmg: 99, cd: 16 },
+  { id: 'elefant', key: '9', ico: '🐘', nm: 'Elefanten',  dmg: 99, cd: 1 },
+  { id: 'fork',    key: '0', ico: '🎵', nm: 'Stimmgabel', dmg: 0,  cd: 3 },
+  { id: 'toni',    key: 't', ico: '🧑‍🔧', nm: 'Toni',       dmg: 0,  cd: 22 }
+];
+const NOERGEL = ['Das A ist zu hoch!', 'Die Tasten sind zu weiss!', 'Der Hocker quietscht!', 'Zu viel Hall hier!', '442 Hz? Ich höre 442,3 Hz!',
+  'Das Pedal riecht komisch.', 'Früher klang alles besser.', 'Ich spiele nur bei Vollmond.', 'Das Fis guckt mich schief an!', 'Zu wenig Seele im Bass.',
+  'Der Deckel glänzt zu sehr!', 'Mir ist das Forte zu laut.'];
+const FLUCHT = ['Skandal!', 'Banausen!', 'Ich rufe meinen Agenten!', 'Unerhört!', 'Schon gut, schon gut!'];
+const TOOLS = Object.fromEntries(TOOLDEF.map(t => [t.id, t]));
+const KRACH = ['KRACH!', 'SCHEPPER!', 'DOING!', 'PLÄNG!', 'RUMMS!', 'KLONK!', 'ZACK!', 'SPLITTER!'];
+
+let state = 'menu', tool = 'bat', touch = matchMedia('(hover: none)').matches;
+let ents = [], debrisList = [], fxList = [], bombs = [], elephants = [], runners = [], fallers = [], roller = null, G, TU = null;
+const cds = Object.fromEntries(TOOLDEF.map(t => [t.id, 0]));
+let best = 0;
+try { best = +localStorage.getItem('smashingPianos3dBest') || 0; } catch (e) {}
+
+/* ---------- Sound (wie in der 2D-Version) ---------- */
+let AC = null, muted = false, noiseBuf = null, pianoWave = null, reverb = null, sawOsc = null, sawGain = null, tuneNodes = null;
+function audio() {
+  if (!AC) {
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      const amps = [0, 1, 0.62, 0.42, 0.3, 0.2, 0.15, 0.1, 0.075, 0.055, 0.04, 0.03, 0.022, 0.016, 0.012, 0.008];
+      pianoWave = AC.createPeriodicWave(new Float32Array(amps.length), new Float32Array(amps));
+      const len = Math.floor(AC.sampleRate * 0.7), imp = AC.createBuffer(2, len, AC.sampleRate);
+      for (let c = 0; c < 2; c++) { const ch = imp.getChannelData(c); for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+      reverb = AC.createConvolver(); reverb.buffer = imp;
+      const wet = AC.createGain(); wet.gain.value = 0.2; reverb.connect(wet).connect(AC.destination);
+      sawOsc = AC.createOscillator(); sawGain = AC.createGain(); sawOsc.type = 'sawtooth'; sawOsc.frequency.value = 95; sawGain.gain.value = 0;
+      sawOsc.connect(sawGain).connect(AC.destination); sawOsc.start();
+    } catch (e) { AC = null; }
+  }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(f, dur, type = 'triangle', vol = 0.12, delay = 0, f2 = null) {
+  if (muted || !audio()) return;
+  const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(AC.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+function noise(dur, vol = 0.25, freq = 1800) {
+  if (muted || !audio()) return;
+  const t = AC.currentTime, s = AC.createBufferSource(), g = AC.createGain(), f = AC.createBiquadFilter();
+  s.buffer = noiseBuf; f.type = 'lowpass'; f.frequency.setValueAtTime(freq, t);
+  f.frequency.exponentialRampToValueAtTime(120, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f).connect(g).connect(AC.destination); s.start(t); s.stop(t + dur + 0.02);
+}
+const midi = m => 440 * Math.pow(2, (m - 69) / 12);
+function piano(m, vol = 0.2, delay = 0, verstimmt = 0, laenge = 1) {
+  if (muted || !audio() || !pianoWave) return;
+  const f = midi(m) * Math.pow(2, rnd(-1, 1) * verstimmt / 1200);
+  const t = AC.currentTime + delay, dur = clamp(1.3 * Math.pow(220 / f, 0.5), 0.3, 1.8) * laenge;
+  const g = AC.createGain(), lp = AC.createBiquadFilter();
+  lp.type = 'lowpass'; lp.Q.value = 0.4;
+  lp.frequency.setValueAtTime(Math.min(f * 14, 11000), t);
+  lp.frequency.exponentialRampToValueAtTime(Math.max(f * 1.6, 300), t + dur * 0.6);
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.004);
+  g.gain.exponentialRampToValueAtTime(vol * 0.42, t + 0.12);
+  g.gain.exponentialRampToValueAtTime(vol * 0.16, t + dur * 0.45);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  const spread = 1.5 + verstimmt * 0.9;
+  for (const d of [-spread, 0.3, spread * 0.8]) {
+    const o = AC.createOscillator(); o.setPeriodicWave(pianoWave);
+    o.frequency.value = f; o.detune.value = d; o.connect(lp); o.start(t); o.stop(t + dur + 0.05);
+  }
+  lp.connect(g); g.connect(AC.destination); g.connect(reverb);
+}
+const SND = {
+  hit()    { noise(0.09, 0.2, 2500); tone(160, 0.1, 'sine', 0.2, 0, 60); const m = Math.floor(rnd(36, 72)); piano(m, 0.09, 0, 40, 0.5); piano(m + pick([1, 6, 11]), 0.07, 0.01, 40, 0.5); },
+  crash()  { noise(0.35, 0.35, 5000); noise(0.1, 0.3, 9000); for (let i = 0; i < 9; i++) piano(Math.floor(rnd(38, 92)), 0.1, rnd(0, 0.06), 60, 0.7); piano(Math.floor(rnd(24, 31)), 0.24, 0.02, 50, 0.8); },
+  boom()   { noise(0.55, 0.5, 900); tone(130, 0.45, 'sine', 0.4, 0, 30); },
+  thud()   { noise(0.3, 0.4, 600); tone(90, 0.35, 'sine', 0.45, 0, 35); },
+  schoen() { [60, 64, 67, 72].forEach((m, i) => piano(m, 0.16, i * 0.06)); },
+  jingle() { [72, 76, 79, 84, 88].forEach((m, i) => piano(m, 0.16, i * 0.07)); },
+  aua()    { [51, 52, 57, 58, 63, 64, 70].forEach((m, i) => piano(m, 0.17, i * 0.015, 70, 0.7)); },
+  klick()  { tone(700, 0.05, 'square', 0.04); },
+  troete() { tone(280, 0.2, 'sawtooth', 0.12, 0, 620); tone(620, 0.3, 'sawtooth', 0.12, 0.2, 380); },
+  motor()  { tone(55, 1.6, 'sawtooth', 0.12, 0, 70); noise(1.6, 0.08, 300); },
+  neu(key) {
+    if (key === 'gut') { tone(660, 0.06, 'square', 0.035); tone(990, 0.08, 'square', 0.035, 0.06); }
+    else if (key === 'pianist') { [520, 520, 390].forEach((f, i) => tone(f, 0.05, 'square', 0.035, i * 0.06)); }
+    else { tone(440, 0.06, 'square', 0.035); tone(294, 0.08, 'square', 0.035, 0.06); }
+  },
+  noergel() { tone(300, 0.07, 'square', 0.03); tone(250, 0.07, 'square', 0.03, 0.08); tone(210, 0.1, 'square', 0.03, 0.16); },
+  weg()    { tone(300, 0.25, 'square', 0.05, 0, 1400); },
+  grauen() { [34, 33, 27].forEach((m, i) => { piano(m, 0.3, i * 0.22, 25, 0.6); piano(m - 12, 0.26, i * 0.22, 25, 0.6); piano(m + 6, 0.12, i * 0.22, 25, 0.6); }); },
+  ploing() { tone(900, 0.5, 'triangle', 0.15, 0, 90); noise(0.1, 0.15, 4000); piano(40, 0.12, 0.05, 60, 0.5); },
+  pling()  { piano(69, 0.2); },
+  cembalo() { [74, 73, 74, 73, 74, 72, 70, 69, 67, 65, 64, 62].forEach((m, i) => zupf(m, 0.1, i * 0.065, 12)); zupf(50, 0.12, 0.78, 12); },
+  zupf()   { zupf(Math.floor(rnd(50, 80)), 0.09, 0, 35); }
+};
+function zupf(m, vol = 0.1, delay = 0, verstimmt = 0) {
+  if (muted || !audio()) return;
+  const f = midi(m) * Math.pow(2, rnd(-1, 1) * verstimmt / 1200), t = AC.currentTime + delay;
+  const g = AC.createGain(), hp = AC.createBiquadFilter();
+  hp.type = 'highpass'; hp.frequency.value = 500;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+  for (const k of [1, 2]) { const o = AC.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f * k; o.detune.value = k * 4; o.connect(hp); o.start(t); o.stop(t + 0.3); }
+  hp.connect(g); g.connect(AC.destination); g.connect(reverb);
+}
+
+/* ---------- 3D-Grundgerüst ---------- */
+const cv = $('c');
+const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(48, 1, 0.5, 220);
+const camBase = new THREE.Vector3(), camLook = new THREE.Vector3();
+function resize() {
+  const w = cv.clientWidth, h = cv.clientHeight, a = w / h;
+  renderer.setSize(w, h, false);
+  camera.aspect = a;
+  // Blick schräg von der Seite auf die Strasse
+  if (a < 0.8)      { camera.fov = 66; camBase.set(7.5, 13.5, 18); camLook.set(-1.2, 0, -15); }   // Handy hochkant
+  else if (a < 1.4) { camera.fov = 56; camBase.set(9, 11, 17);     camLook.set(-1.5, 0, -12); }
+  else              { camera.fov = 46; camBase.set(10.5, 9, 15);   camLook.set(-2, 0, -9); }
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+
+// Himmel + Dunst
+(function () {
+  const c = document.createElement('canvas'); c.width = 4; c.height = 256;
+  const x = c.getContext('2d'), g = x.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, '#23254d'); g.addColorStop(0.55, '#7a4a6e'); g.addColorStop(0.8, '#e98a5b'); g.addColorStop(1, '#f2b880');
+  x.fillStyle = g; x.fillRect(0, 0, 4, 256);
+  scene.background = new THREE.CanvasTexture(c);
+})();
+scene.fog = new THREE.Fog(0xd98a66, 45, 110);
+
+scene.add(new THREE.HemisphereLight(0xffe2c4, 0x3a2f52, 0.85));
+const sun = new THREE.DirectionalLight(0xffd3a1, 0.95);
+sun.position.set(-18, 30, 12); sun.target.position.set(0, 0, -26);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 48, bottom: -48, near: 1, far: 120 });
+scene.add(sun, sun.target);
+const boomLight = new THREE.PointLight(0xffa030, 0, 40); scene.add(boomLight);
+
+// Material- und Geometrie-Vorrat
+const mats = {}, geos = {};
+const mat = c => mats[c] || (mats[c] = new THREE.MeshLambertMaterial({ color: c }));
+const box = (w, h, d) => geos[w + '|' + h + '|' + d] || (geos[w + '|' + h + '|' + d] = new THREE.BoxGeometry(w, h, d));
+const unitBox = new THREE.BoxGeometry(1, 1, 1), sphereGeo = new THREE.SphereGeometry(1, 16, 12);
+const cyl = (r1, r2, h, seg = 16) => geos['c' + r1 + r2 + h + seg] || (geos['c' + r1 + r2 + h + seg] = new THREE.CylinderGeometry(r1, r2, h, seg));
+const goodMat = new THREE.MeshPhongMaterial({ color: 0x17171b, shininess: 110, specular: 0x999999 });
+const goldMat = new THREE.MeshPhongMaterial({ color: 0xc9a227, shininess: 80, specular: 0xffe9a3 });
+function mesh(geo, m, x, y, z, parent, shadow = true) { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.castShadow = shadow; parent.add(me); return me; }
+
+// Schrift als Bild (für Schilder und schwebende Zeichen)
+const texCache = {};
+function textTex(txt, color, font = '900 96px system-ui', w = 128, h = 128) {
+  const k = txt + color + font;
+  if (!texCache[k]) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x = c.getContext('2d'); x.font = font; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = color; x.fillText(txt, w / 2, h / 2, w - 8);
+    texCache[k] = new THREE.CanvasTexture(c);
+  }
+  return texCache[k];
+}
+function sprite(txt, color, size) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTex(txt, color), transparent: true, depthWrite: false }));
+  s.scale.set(size, size, 1); return s;
+}
+
+/* ---------- Kulisse ---------- */
+(function buildWorld() {
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), mat(0x3a3542));
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(14.6, 140), mat(0x5b5563));
+  road.rotation.x = -Math.PI / 2; road.position.set(0, 0.01, -50); road.receiveShadow = true; scene.add(road);
+  for (const x of [-2.25, 2.25]) for (let z = 2; z > -110; z -= 6) { const l = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 3), mat(0xcfc9d8)); l.rotation.x = -Math.PI / 2; l.position.set(x, 0.02, z); scene.add(l); }
+  for (const x of [-7.6, 7.6]) mesh(box(0.6, 0.3, 140), mat(0x8a8494), x, 0.15, -50, scene, false).receiveShadow = true;
+
+  // roter Teppich + Eingang zum Konzertsaal (unterhalb der Kamera)
+  const carpet = new THREE.Mesh(new THREE.PlaneGeometry(14.6, 16), mat(0x8c1f28)); carpet.rotation.x = -Math.PI / 2; carpet.position.set(0, 0.03, Z_DOOR + 8); carpet.receiveShadow = true; scene.add(carpet);
+  mesh(box(14.6, 0.06, 0.35), goldMat, 0, 0.04, Z_DOOR, scene, false);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(11, 1.5), new THREE.MeshBasicMaterial({ map: textTex('▼  KONZERTSAAL  ▼', '#ffd98a', '900 64px system-ui', 1024, 128), transparent: true }));
+  sign.rotation.x = -Math.PI / 2; sign.position.set(0, 0.05, Z_DOOR - 1.3); scene.add(sign);
+  for (const x of [-8.2, 8.2]) {
+    mesh(box(0.9, 4.2, 0.9), mat(0xd9c9a8), x, 2.1, Z_DOOR, scene);
+    mesh(sphereGeo, new THREE.MeshBasicMaterial({ color: 0xffe9a3 }), x, 4.7, Z_DOOR, scene, false).scale.setScalar(0.5);
+  }
+
+  // Häuser mit Fenstern
+  const wc = document.createElement('canvas'); wc.width = 64; wc.height = 128;
+  const wx = wc.getContext('2d'); wx.fillStyle = '#3a2f52'; wx.fillRect(0, 0, 64, 128);
+  for (let y = 6; y < 128; y += 16) for (let x = 6; x < 64; x += 14) { wx.fillStyle = Math.random() < 0.45 ? '#ffd98a' : '#2b2340'; wx.fillRect(x, y, 8, 10); }
+  const wt = new THREE.CanvasTexture(wc); wt.wrapS = wt.wrapT = THREE.RepeatWrapping; wt.repeat.set(2, 2);
+  const hm = new THREE.MeshLambertMaterial({ map: wt });
+  for (const side of [-1, 1]) for (let z = 8; z > -115; z -= 7.5) {
+    const h = rnd(7, 20), w = rnd(5.5, 7);
+    const b = mesh(box(1, 1, 1), hm, side * (12.5 + w / 2 + rnd(0, 2.5)), h / 2, z + rnd(-0.6, 0.6), scene, false);
+    b.scale.set(w, h, 6.5); b.receiveShadow = true;
+  }
+})();
+
+/* ---------- Plakat über der Strasse (Werbung) ---------- */
+const boardCv = document.createElement('canvas'); boardCv.width = 1024; boardCv.height = 300;
+const boardTex = new THREE.CanvasTexture(boardCv);
+let boardIdx = -1;
+function drawBoard(i) {
+  const x = boardCv.getContext('2d');
+  x.fillStyle = '#fffaf0'; x.fillRect(0, 0, 1024, 300);
+  x.fillStyle = '#b3261e'; x.fillRect(0, 0, 1024, 22);
+  x.textAlign = 'center'; x.fillStyle = '#1b1b1b'; x.font = '900 92px system-ui'; x.fillText(CONFIG.firma, 512, 116, 980);
+  x.fillStyle = '#b3261e'; x.font = '700 40px system-ui'; x.fillText(CONFIG.slogan, 512, 166, 980);
+  x.fillStyle = '#333'; x.font = 'italic 40px system-ui'; x.fillText('«' + CONFIG.plakat[i % CONFIG.plakat.length] + '»', 512, 222, 990);
+  const contact = [CONFIG.telefon && '☎ ' + CONFIG.telefon, webShort, CONFIG.social].filter(Boolean).join('  ·  ');
+  x.fillStyle = '#1b1b1b'; x.font = '800 36px system-ui'; x.fillText(contact, 512, 276, 990);
+  boardTex.needsUpdate = true;
+}
+(function () {
+  const g = new THREE.Group(); g.position.set(0, -2.2, -24); g.rotation.y = 0.22;   // leicht zur Kamera gedreht
+  mesh(box(15.4, 4.9, 0.4), mat(0x2a2530), 0, 10.4, 0, g);
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(14.8, 4.34), new THREE.MeshBasicMaterial({ map: boardTex, fog: false })); p.position.set(0, 10.4, 0.22); g.add(p);
+  for (const x of [-8.2, 8.2]) mesh(box(0.5, 12.6, 0.5), mat(0x2a2530), x, 6.3, 0, g);
+  scene.add(g);
+})();
+
+/* ---------- Klaviere ---------- */
+function keysTexture(clean) {
+  const k = 'keys' + clean;
+  if (!texCache[k]) {
+    const c = document.createElement('canvas'); c.width = 420; c.height = 80;
+    const x = c.getContext('2d'); x.fillStyle = clean ? '#ffffff' : '#e6dcc0'; x.fillRect(0, 0, 420, 80);
+    for (let i = 0; i < 21; i++) {
+      if (!clean && Math.random() < 0.14) { x.fillStyle = '#3a2f22'; x.fillRect(i * 20, 0, 20, 80); }   // fehlende Taste
+      x.fillStyle = '#555'; x.fillRect(i * 20, 0, 1.5, 80);
+      if (![2, 6].includes(i % 7)) { x.fillStyle = '#111'; x.fillRect(i * 20 + 13, 0, 13, clean ? 48 : 44 + rnd(-6, 6)); }
+    }
+    texCache[k] = new THREE.CanvasTexture(c);
+  }
+  return texCache[k];
+}
+const keysGeo = new THREE.PlaneGeometry(2.9, 0.62);
+const hitGeo = new THREE.BoxGeometry(3.7, 3.5, 2.6), hitGeoTouch = new THREE.BoxGeometry(4.3, 4.2, 3.4);
+const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+
+function buildPiano(key) {
+  const T = TYPES[key], g = new THREE.Group(), body = T.good ? goodMat : mat(T.body), dark = T.good ? mat(0x000000) : mat(T.dark);
+  mesh(box(3, 2.4, 0.9), body, 0, 1.5, 0, g);                      // Korpus
+  mesh(box(3.2, 0.14, 1.05), dark, 0, 2.77, 0, g);                 // Deckel
+  mesh(box(2.5, 0.9, 0.06), T.good ? goldMat : dark, 0, 2.05, 0.44, g, false).scale.set(1, 1, 1);   // Zierfeld
+  mesh(box(2.4, 0.8, 0.07), body, 0, 2.05, 0.45, g, false);
+  mesh(box(3.1, 0.26, 0.8), dark, 0, 1.13, 0.78, g);               // Tastenbrett
+  const keys = new THREE.Mesh(keysGeo, new THREE.MeshLambertMaterial({ map: keysTexture(!!T.good) }));
+  keys.rotation.x = -Math.PI / 2 + 0.12; keys.position.set(0, 1.28, 0.8); g.add(keys);
+  for (const x of [-1.38, 1.38]) mesh(box(0.22, 0.9, 0.22), dark, x, 0.6, 1.0, g);
+  for (const x of [-1.3, 1.3]) for (const z of [-0.3, 0.95]) mesh(sphereGeo, mat(0x1a1a1a), x, 0.17, z, g, false).scale.setScalar(0.17);
+  const anims = [];
+  if (T.good) {
+    const disc = mesh(cyl(0.34, 0.34, 0.06, 20), goldMat, 1.0, 2.3, 0.5, g, false); disc.rotation.x = Math.PI / 2;
+    const chk = sprite('✓', '#17171b', 0.55); chk.position.set(1.0, 2.3, 0.56); g.add(chk);
+    for (let i = 0; i < 3; i++) { const s = sprite('✦', '#ffe9a3', 0.7); g.add(s); anims.push(t => { const a = t * 2 + i * 2.1; s.position.set(Math.cos(a) * 2, 1.7 + Math.sin(a * 1.3) * 1.3, 0.7); s.material.opacity = 0.5 + 0.5 * Math.sin(a * 2); }); }
+  } else if (key === 'verstimmt') {
+    for (let i = 0; i < 3; i++) { const s = sprite(i % 2 ? '♯' : '♭', '#b6f04a', 0.95); g.add(s); anims.push(t => s.position.set(-1 + i + Math.sin(t * 3 + i * 2) * 0.25, 3.3 + ((t * 0.6 + i * 0.35) % 1), 0.2)); }
+  } else if (key === 'schimmel') {
+    for (let i = 0; i < 9; i++) mesh(sphereGeo, mat(0x2d3a14), rnd(-1.4, 1.4), rnd(0.5, 2.7), 0.44 + rnd(-0.03, 0.05), g, false).scale.set(rnd(0.15, 0.36), rnd(0.15, 0.36), 0.08);
+    for (let i = 0; i < 3; i++) { const f = mesh(sphereGeo, mat(0x111111), 0, 0, 0, g, false); f.scale.setScalar(0.07); anims.push(t => { const a = t * (4 + i) + i * 1.7; f.position.set(Math.cos(a) * (1.3 + i * 0.3), 3.2 + Math.sin(a * 1.4) * 0.5, Math.sin(a) * 0.8); }); }
+  } else if (key === 'wasser') {
+    const pud = new THREE.Mesh(new THREE.CircleGeometry(2.3, 24), new THREE.MeshBasicMaterial({ color: 0x6fb7e9, transparent: true, opacity: 0.4 })); pud.rotation.x = -Math.PI / 2; pud.position.y = 0.04; g.add(pud);
+    const dm = new THREE.MeshBasicMaterial({ color: 0x8fd0ff });
+    for (let i = 0; i < 5; i++) { const d = mesh(sphereGeo, dm, rnd(-1.4, 1.4), 0, 0.5, g, false); d.scale.set(0.06, 0.12, 0.06); anims.push(t => d.position.y = 1.0 - ((t * 1.2 + i * 0.37) % 1) * 0.95); }
+  }
+  return finish(g, anims, 3.7, 3.5, 2.6, 1.6, 3.5);
+}
+// Lebensbalken + unsichtbare Trefferzone (für Finger etwas grösser)
+function finish(g, anims, w, h, d, y, barY, z = 0) {
+  const bar = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xe63946, depthTest: false })); bar.position.set(0, barY, 0); bar.visible = false; g.add(bar);
+  const p = touch ? 0.7 : 0;
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(w + p, h + p, d + p), hitMat); hit.position.set(0, y, z); g.add(hit);
+  return { g, hit, bar, anims };
+}
+
+// Sprechblase der Pianisten
+function bubbleTex(text) {
+  const k = 'bub' + text;
+  if (!texCache[k]) {
+    const c = document.createElement('canvas'); c.width = 640; c.height = 120;
+    const x = c.getContext('2d'); x.font = '700 44px system-ui';
+    const tw = Math.min(620, x.measureText(text).width + 44);
+    x.fillStyle = '#fff'; x.fillRect((640 - tw) / 2, 6, tw, 76);
+    x.beginPath(); x.moveTo(300, 80); x.lineTo(340, 80); x.lineTo(320, 116); x.fill();
+    x.fillStyle = '#1b1b1b'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 320, 46, 600);
+    texCache[k] = new THREE.CanvasTexture(c);
+  }
+  return texCache[k];
+}
+function buildPianist() {
+  const g = new THREE.Group(), bl = mat(0x15151a), skin = mat(0xf1c9a5), grey = mat(0xc9c9d2), anims = [];
+  const legs = [-0.25, 0.25].map(x => { const p = new THREE.Group(); p.position.set(x, 1.5, 0); mesh(cyl(0.17, 0.15, 1.5, 8), bl, 0, -0.75, 0, p); mesh(box(0.3, 0.16, 0.55), mat(0x000000), 0, -1.45, 0.15, p, false); g.add(p); return p; });
+  mesh(cyl(0.5, 0.42, 1.5, 12), bl, 0, 2.2, 0, g);                                   // Frack
+  mesh(box(0.34, 1.0, 0.06), mat(0xffffff), 0, 2.35, 0.46, g, false);                // Hemdbrust
+  mesh(box(0.36, 0.14, 0.08), mat(0xc1121f), 0, 2.84, 0.5, g, false);                // Fliege
+  mesh(box(0.5, 0.9, 0.12), bl, 0, 1.25, -0.42, g, false).rotation.x = 0.25;         // Frackschösse
+  mesh(sphereGeo, skin, 0, 3.35, 0.05, g).scale.setScalar(0.45);                     // Kopf
+  for (const [x, y, z, r] of [[0, 3.72, -0.2, 0.38], [-0.36, 3.5, -0.15, 0.3], [0.36, 3.5, -0.15, 0.3], [0, 3.35, -0.4, 0.36], [-0.25, 3.82, 0, 0.25], [0.25, 3.82, 0, 0.25]]) mesh(sphereGeo, grey, x, y, z, g, false).scale.setScalar(r);
+  mesh(new THREE.ConeGeometry(0.1, 0.36, 8), skin, 0, 3.42, 0.52, g, false).rotation.x = 1.2;   // Nase hoch
+  for (const x of [-0.16, 0.16]) mesh(box(0.14, 0.04, 0.04), mat(0x3a2a1a), x, 3.5, 0.44, g, false);
+  const arm = new THREE.Group(); arm.position.set(0.56, 2.8, 0); mesh(cyl(0.13, 0.12, 1.1, 8), bl, 0, 0.55, 0, arm); mesh(cyl(0.05, 0.05, 0.4, 6), skin, 0, 1.25, 0, arm, false); g.add(arm);
+  mesh(box(0.5, 0.65, 0.08), mat(0xf5f1e6), -0.62, 2.1, 0.2, g, false).rotation.z = 0.3;       // Notenmappe
+  const bub = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex(' '), transparent: true, depthTest: false })); bub.scale.set(6.4, 1.2, 1); bub.position.set(0, 4.9, 0); bub.visible = false; g.add(bub);
+  const m = finish(g, anims, 1.9, 4.2, 1.9, 2.1, 4.3);
+  m.bub = bub; m.legs = legs; m.arm = arm;
+  return m;
+}
+function buildGrand() {   // Konzertflügel des Grauens: der Deckel ist das Maul
+  const g = new THREE.Group(), T = TYPES.boss, b = mat(T.body), d = mat(T.dark), anims = [], white = mat(0xf5f1e6);
+  mesh(box(4.6, 1.0, 5.5), b, 0, 2.1, -1.2, g);
+  mesh(box(4.4, 0.06, 5.3), mat(0x7a1626), 0, 2.62, -1.2, g, false);
+  mesh(box(4.6, 0.3, 0.9), d, 0, 1.75, 1.95, g);
+  const keys = new THREE.Mesh(new THREE.PlaneGeometry(4.3, 0.7), new THREE.MeshLambertMaterial({ map: keysTexture(false) })); keys.rotation.x = -Math.PI / 2 + 0.12; keys.position.set(0, 1.93, 2.0); g.add(keys);
+  for (const [x, z] of [[-1.9, 1.2], [1.9, 1.2], [0, -3.4]]) mesh(cyl(0.22, 0.14, 1.6, 10), d, x, 0.8, z, g);
+  const lid = new THREE.Group(); lid.position.set(0, 2.66, -3.95); mesh(box(4.6, 0.16, 5.5), b, 0, 0, 2.75, lid); g.add(lid);
+  const tooth = new THREE.ConeGeometry(0.22, 0.6, 6);
+  for (let i = 0; i < 7; i++) { const x = -1.95 + i * 0.65; mesh(tooth, white, x, 2.92, 1.4, g, false); mesh(tooth, white, x, -0.36, 5.35, lid, false).rotation.x = Math.PI; }
+  for (const x of [-0.95, 0.95]) {
+    mesh(sphereGeo, new THREE.MeshBasicMaterial({ color: 0xffdd00 }), x, 2.2, 1.56, g, false).scale.set(0.34, 0.24, 0.1);
+    mesh(sphereGeo, new THREE.MeshBasicMaterial({ color: 0xd00000 }), x, 2.2, 1.63, g, false).scale.setScalar(0.13);
+    mesh(box(0.8, 0.12, 0.08), mat(0x000000), x, 2.5, 1.6, g, false).rotation.z = x < 0 ? -0.35 : 0.35;
+  }
+  for (let i = 0; i < 4; i++) { const s = sprite(i % 2 ? '♯' : '♭', '#d36bff', 1.3); g.add(s); anims.push(t => s.position.set(-2 + i * 1.3 + Math.sin(t * 2.5 + i) * 0.3, 5.2 + ((t * 0.7 + i * 0.3) % 1) * 1.4, 0)); }
+  anims.push(t => lid.rotation.x = -(0.32 + Math.sin(t * 5) * 0.14));
+  return finish(g, anims, 5.2, 5, 7, 2.4, 6.2, -1);
+}
+function keysTextureInv() {   // Cembalo: schwarze Untertasten, helle Obertasten
+  if (!texCache.keysInv) {
+    const c = document.createElement('canvas'); c.width = 420; c.height = 60;
+    const x = c.getContext('2d'); x.fillStyle = '#1a1a1a'; x.fillRect(0, 0, 420, 60);
+    for (let i = 0; i < 21; i++) { x.fillStyle = '#555'; x.fillRect(i * 20, 0, 1.5, 60); if (![2, 6].includes(i % 7)) { x.fillStyle = '#e8dfc4'; x.fillRect(i * 20 + 13, 0, 13, 36); } }
+    texCache.keysInv = new THREE.CanvasTexture(c);
+  }
+  return texCache.keysInv;
+}
+function buildCembalo() {
+  const g = new THREE.Group(), T = TYPES.cembalo, b = mat(T.body), d = mat(T.dark), anims = [];
+  mesh(box(3.2, 0.7, 5), b, 0, 2.05, -1, g);
+  for (const [x, z] of [[-1.4, 1.2], [1.4, 1.2], [-1.4, -3.2], [1.4, -3.2]]) { mesh(cyl(0.1, 0.07, 1.7, 8), d, x, 0.85, z, g); mesh(sphereGeo, d, x, 1.0, z, g, false).scale.setScalar(0.17); }
+  mesh(box(3, 0.06, 0.06), d, 0, 0.5, 1.2, g, false);
+  for (let r = 0; r < 2; r++) {   // zwei Manuale
+    mesh(box(3.0, 0.12, 0.5), d, 0, 1.68 + r * 0.14, 1.9 - r * 0.3, g, false);
+    const k = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 0.4), new THREE.MeshLambertMaterial({ map: keysTextureInv() })); k.rotation.x = -Math.PI / 2; k.position.set(0, 1.75 + r * 0.14, 1.93 - r * 0.3); g.add(k);
+  }
+  const lid = new THREE.Group(); lid.position.set(-1.6, 2.42, -1); mesh(box(3.2, 0.1, 5), d, 1.6, 0, 0, lid); mesh(box(3.0, 0.02, 4.8), mat(0x6f8f86), 1.6, -0.06, 0, lid, false); lid.rotation.z = 0.85; g.add(lid);
+  mesh(cyl(0.04, 0.04, 2.1, 6), d, 0.4, 3.2, 0.6, g, false).rotation.z = -0.5;       // Deckelstütze
+  for (let i = 0; i < 9; i++) mesh(sphereGeo, mat(0xcfc7b0), rnd(-1.3, 1.3), 2.42, rnd(-3.2, 1.2), g, false).scale.set(rnd(0.3, 0.6), 0.06, rnd(0.3, 0.6));   // Staubschicht
+  for (const x of [-0.6, 0.6]) {  // müde Augen
+    mesh(sphereGeo, new THREE.MeshBasicMaterial({ color: 0xf0e6b8 }), x, 2.14, 1.51, g, false).scale.set(0.26, 0.2, 0.08);
+    mesh(sphereGeo, mat(0x3a2a10), x, 2.1, 1.57, g, false).scale.setScalar(0.09);
+    mesh(box(0.6, 0.16, 0.12), b, x, 2.28, 1.56, g, false);
+  }
+  anims.push(t => g.rotation.x = Math.sin(t * 9) * 0.012);
+  return finish(g, anims, 4, 4.4, 6, 2.2, 5.6, -1);
+}
+
+function addEnt(key, lane) {
+  const T = TYPES[key], boss = !!T.boss;
+  const m = key === 'pianist' ? buildPianist() : key === 'boss' ? buildGrand() : key === 'cembalo' ? buildCembalo() : buildPiano(key);
+  const e = Object.assign(m, { key, T, boss, lane, x: LANES[lane], z: Z_SPAWN - (boss ? 4 : 0), hp: T.hp, maxHp: T.hp,
+    speed: (2.7 + diffNow() * 2.7) * T.speed * (boss ? 1 : rnd(0.9, 1.15)), punch: 0, tilt: 0, ph: rnd(0, 6), base: T.person ? 1.15 : 1, nagT: 0.8, nagShow: 0 });
+  e.hit.userData.ent = e;
+  e.g.position.set(e.x, 0, e.z); scene.add(e.g); ents.push(e);
+  return e;
+}
+function spawn() {
+  const diff = Math.min(diffNow(), 1);
+  let key;
+  if (Math.random() < 0.25) key = 'gut';
+  else { const r = Math.random(); key = r < 0.5 - diff * 0.2 ? 'verstimmt' : r < 0.74 ? 'wasser' : 'schimmel'; }
+  if (G.t > 12 && Math.random() < 0.07) key = 'pianist';
+  addEnt(key, Math.floor(Math.random() * 3));
+  SND.neu(key);
+}
+function spawnBoss() {
+  if (G.bossN++ % 2 === 0) { addEnt('boss', 1); sayCenter('DER KONZERTFLÜGEL DES GRAUENS!', '#d36bff', 30, -2); SND.grauen(); }
+  else { addEnt('cembalo', 1); sayCenter('DAS VERSTAUBTE CEMBALO!', '#d9c58a', 30, -2); sayCenter('Hust, hust … Anno 1723', '#fff', 18, -1); SND.cembalo(); }
+  G.shake = 0.5;
+}
+const diffNow = () => G.t < 60 ? G.t / 60 : Math.min(1 + (G.t - 60) / 240, 1.6);
+
+/* ---------- Trümmer & Effekte ---------- */
+function debris(e, n, burst) {
+  const cols = [e.T.body, e.T.dark, 0xf5f1e6, 0xf5f1e6, 0x111111, 0xc9a227];
+  for (let i = 0; i < n; i++) {
+    const c = pick(cols), keyPiece = c === 0xf5f1e6 || c === 0x111111;
+    const m = new THREE.Mesh(unitBox, mat(c));
+    if (keyPiece) m.scale.set(0.14, 0.1, 0.5); else m.scale.set(rnd(0.3, 1.1), rnd(0.08, 0.3), rnd(0.2, 0.6));
+    m.position.set(e.x + rnd(-1.4, 1.4) * (e.boss ? 1.6 : 1), rnd(0.3, 2.7), e.z + (e.boss ? rnd(-4, 2) : rnd(-0.5, 0.9)));
+    m.rotation.set(rnd(0, 6), rnd(0, 6), rnd(0, 6));
+    scene.add(m);
+    debrisList.push({ m, vx: rnd(-1, 1) * burst, vy: rnd(0.35, 1.3) * burst, vz: rnd(-1, 1) * burst, rx: rnd(-9, 9), rz: rnd(-9, 9), life: rnd(1.6, 3) });
+  }
+  while (debrisList.length > 320) scene.remove(debrisList.shift().m);
+}
+const flashGeo = new THREE.SphereGeometry(1, 14, 10);
+function burst(x, y, z, color, size, dur, op = 0.85) {
+  const m = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, depthWrite: false }));
+  m.position.set(x, y, z); scene.add(m); fxList.push({ m, t: 0, dur, size, op });
+}
+const pv = new THREE.Vector3();
+function say(x, y, z, text, color = '#fff', size = 22, long) {
+  pv.set(x, y, z).project(camera);
+  const d = document.createElement('div'); d.className = 'ft' + (long ? ' long' : ''); d.textContent = text;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  d.style.left = clamp((pv.x + 1) / 2 * w, 70, w - 70) + 'px'; d.style.top = clamp((1 - pv.y) / 2 * h, 60, h - 90) + 'px';
+  d.style.color = color; d.style.fontSize = size * (w < 520 ? 0.85 : 1) + 'px';
+  $('texts').append(d); setTimeout(() => d.remove(), long ? 3000 : 1500);
+}
+function sayCenter(text, color, size, row = 0) {
+  const d = document.createElement('div'); d.className = 'ft long'; d.textContent = text;
+  d.style.left = '50%'; d.style.top = (38 + row * 7) + '%'; d.style.color = color; d.style.fontSize = size * (cv.clientWidth < 520 ? 0.75 : 1) + 'px';
+  $('texts').append(d); setTimeout(() => d.remove(), 3000);
+}
+
+/* ---------- Schaden ---------- */
+function damage(e, dmg, quiet) {
+  if (e.dead) return;
+  if (e.boss) dmg = Math.min(dmg, 10);
+  e.hp -= dmg;
+  if (quiet) e.punch = Math.max(e.punch, 0.03);
+  else {
+    e.punch = e.boss ? 0.07 : 0.14;
+    if (!e.boss && !e.T.person) e.tilt += rnd(-0.05, 0.05);
+    if (!e.T.person) debris(e, 3, 6);
+    if (e.key === 'cembalo') { SND.zupf(); burst(e.x + rnd(-1, 1), 3, e.z, 0xb9ad8c, 2.2, 0.9, 0.4); }
+  }
+  e.bar.visible = !e.T.good && !e.boss && e.hp > 0; e.bar.scale.set(2.2 * Math.max(0, e.hp / e.maxHp), 0.2, 1);
+  if (e.hp <= 0) destroy(e);
+}
+function removeEnt(e) { e.dead = true; scene.remove(e.g); }
+function comboPts(e) { G.combo = G.comboT > 0 ? G.combo + 1 : 1; G.comboT = 2.5; const pts = e.T.pts * G.combo; G.score += pts; return '+' + pts + (G.combo > 1 ? '  ×' + G.combo : ''); }
+function chargeEle() { if (G.ele < ELE_NEED && ++G.ele === ELE_NEED) sayCenter('🐘 Elefanten bereit!', '#ffb703', 24, -3); }
+function shoo(e) {   // Pianisten werden nicht zerlegt, sondern verjagt
+  e.dead = true; G.shooed++; e.bar.visible = false;
+  say(e.x, 5.4, e.z, 'VERJAGT!', '#ffb703', 28); say(e.x, 4, e.z, comboPts(e), '#fff', 20);
+  e.g.rotation.y = Math.PI; e.bub.material.map = bubbleTex(pick(FLUCHT)); e.bub.visible = true;
+  runners.push(e); chargeEle(); SND.weg();
+}
+function destroy(e) {
+  if (e.T.person) return shoo(e);
+  removeEnt(e);
+  debris(e, e.boss ? 80 : 34, e.boss ? 14 : 11); burst(e.x, 1.5, e.z, 0xffffff, e.boss ? 6 : 3, 0.2);
+  G.shake = Math.max(G.shake, e.boss ? 1.2 : 0.5);
+  if (e.boss) {
+    G.kills++;
+    sayCenter(e.key === 'cembalo' ? 'CEMBALO ENTSTAUBT!' : 'FLÜGEL GESTUTZT!', '#d36bff', 32, -2); sayCenter(comboPts(e) + '   +2 Dynamit 🧨', '#fff', 20, -1);
+    G.tnt += 2; chargeEle(); SND.crash(); SND.boom();
+    return;
+  }
+  if (e.T.good) {
+    G.lives--; G.combo = 0; G.score = Math.max(0, G.score - 300); redFlash();
+    say(e.x, 4.2, e.z, 'STOPP! Das war frisch gestimmt!', '#ff6b6b', 22); say(e.x, 2.6, e.z, '−300', '#ff6b6b', 20);
+    SND.crash(); SND.aua();
+  } else {
+    G.kills++;
+    say(e.x, 4.4, e.z, pick(KRACH), '#ffb703', 30); say(e.x, 2.8, e.z, comboPts(e), '#fff', 20);
+    if (G.kills % 12 === 0) { G.tnt++; sayCenter('+1 Dynamit 🧨', '#ffb703', 24, -4); }
+    chargeEle(); SND.crash();
+  }
+  if (G.lives <= 0) gameOver();
+}
+function areaHit(x, z, radius, dmg) { for (const e of ents.slice()) if (!e.dead && Math.hypot(e.x - x, e.z - z) < radius + (e.boss ? 2.5 : 1)) damage(e, dmg); }
+const hitList = () => ents.filter(e => !e.dead).map(e => e.hit);
+
+// verstimmtes Modell gegen ein frisch gestimmtes tauschen
+function makeGood(e, pts, msg, sub) {
+  scene.remove(e.g);
+  Object.assign(e, buildPiano('gut'), { key: 'gut', T: TYPES.gut, hp: TYPES.gut.hp, maxHp: TYPES.gut.hp, tilt: 0, frozen: false });
+  e.hit.userData.ent = e; e.g.position.set(e.x, 0, e.z); scene.add(e.g);
+  G.saved++; G.score += pts; SND.schoen();
+  say(e.x, 5, e.z, msg, '#ffd166', 28); say(e.x, 3.6, e.z, sub, '#fff', 17);
+}
+
+/* ---------- Klavierstimmer Toni ---------- */
+let toni = null;
+function buildToni() {
+  const g = new THREE.Group(), suit = mat(0x18223d), skin = mat(0xf1c9a5), white = mat(0xffffff), hair = mat(0x6b4226), black = mat(0x111111);
+  const legs = [-0.25, 0.25].map(x => { const p = new THREE.Group(); p.position.set(x, 1.5, 0); mesh(cyl(0.19, 0.17, 1.5, 8), suit, 0, -0.75, 0, p); mesh(box(0.32, 0.18, 0.6), mat(0x000000), 0, -1.45, 0.15, p, false); g.add(p); return p; });
+  mesh(cyl(0.52, 0.46, 1.55, 12), suit, 0, 2.2, 0, g);                              // schwarzblaues Jackett
+  mesh(box(0.3, 0.75, 0.06), white, 0, 2.6, 0.48, g, false);                        // Hemd
+  mesh(box(0.12, 0.7, 0.07), mat(0x27407a), 0, 2.58, 0.5, g, false);                // Krawatte
+  for (const x of [-0.2, 0.2]) mesh(box(0.14, 0.8, 0.07), mat(0x0b1120), x, 2.55, 0.49, g, false).rotation.z = x < 0 ? -0.18 : 0.18;   // Revers
+  mesh(sphereGeo, skin, 0, 3.35, 0.05, g).scale.setScalar(0.45);
+  for (const [x, y, z, sx, sy, sz] of [[0, 3.6, -0.05, 0.47, 0.3, 0.47], [0, 3.42, -0.22, 0.44, 0.36, 0.34], [0.12, 3.68, 0.22, 0.3, 0.14, 0.24]]) mesh(sphereGeo, hair, x, y, z, g, false).scale.set(sx, sy, sz);   // braune Haare
+  for (const x of [-0.16, 0.16]) mesh(sphereGeo, mat(0x222222), x, 3.34, 0.46, g, false).scale.setScalar(0.05);
+  // schwarze Arzttasche
+  mesh(box(0.8, 0.4, 0.4), black, -0.78, 1.45, 0, g);
+  const top = mesh(cyl(0.2, 0.2, 0.8, 12), black, -0.78, 1.65, 0, g); top.rotation.z = Math.PI / 2;
+  const handle = mesh(new THREE.TorusGeometry(0.14, 0.03, 6, 12, Math.PI), black, -0.78, 1.85, 0, g, false);
+  mesh(box(0.12, 0.08, 0.05), goldMat, -0.78, 1.68, 0.2, g, false);
+  mesh(cyl(0.11, 0.1, 1.0, 8), suit, -0.64, 2.4, 0, g, false);
+  const arm = new THREE.Group(); arm.position.set(0.6, 2.8, 0);
+  mesh(cyl(0.12, 0.11, 1.0, 8), suit, 0, 0.5, 0, arm); mesh(sphereGeo, skin, 0, 1.05, 0, arm, false).scale.setScalar(0.12);
+  mesh(cyl(0.05, 0.05, 0.8, 6), mat(0x9aa0aa), 0, 1.5, 0, arm, false); mesh(box(0.18, 0.28, 0.18), mat(0x7a4a2a), 0, 1.15, 0, arm, false);   // Stimmhammer
+  arm.rotation.x = 1.1; g.add(arm);
+  const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTex('TONI', '#ffffff', '900 60px system-ui', 256, 96), transparent: true, depthTest: false })); tag.scale.set(2.4, 0.9, 1); tag.position.set(0, 4.5, 0); g.add(tag);
+  const bg = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xb3261e, depthTest: false })); bg.scale.set(2.2, 0.75, 1); bg.position.set(0, 4.5, -0.01); bg.renderOrder = -1; g.add(bg);
+  g.scale.setScalar(1.15);
+  return { g, legs, arm };
+}
+function updateToni(dt) {
+  const t = toni; t.ph += dt;
+  const run = k => { t.legs[0].rotation.x = Math.sin(t.ph * 24) * 0.9 * k; t.legs[1].rotation.x = -Math.sin(t.ph * 24) * 0.9 * k; };
+  if (t.phase !== 'back' && t.e.dead) { t.phase = 'back'; t.g.rotation.y = 0; }
+  if (t.phase === 'go') {
+    const tz = t.e.z + 2.1; t.z -= Math.min(t.z - tz, 32 * dt); run(1);
+    if (t.z - tz < 0.05) { t.phase = 'tune'; t.t = 0; run(0); }
+  } else if (t.phase === 'tune') {
+    t.t += dt; t.arm.rotation.x = 1.1 + Math.sin(t.ph * 16) * 0.45;
+    if (Math.random() < dt * 6) piano(pick([57, 61, 64, 69]), 0.1, 0, 40 * (1 - t.t / 1.6), 0.5);   // wird hörbar sauberer
+    if (t.t >= 1.6) { makeGood(t.e, 300, 'Toni hat es gerichtet! +300', 'Gestimmt von ' + CONFIG.firma + ' ✓'); t.phase = 'back'; t.g.rotation.y = 0; }
+  } else { t.z += 32 * dt; run(1); if (t.z > Z_DOOR + 7) { scene.remove(t.g); toni = null; return; } }
+  t.g.position.set(t.x, 0, t.z);
+}
+
+/* ---------- Stimm-Minispiel ---------- */
+const TUNE_ZONE = [0.17, 0.13, 0.095], TUNE_SPEED = [2.6, 3.4, 4.3];
+function tuneUI() {
+  const z = TUNE_ZONE[TU.step];
+  $('tuneTitle').textContent = 'Stimmen statt Schrotten – Saite ' + (TU.step + 1) + ' von 3';
+  $('tuneHint').textContent = (touch ? 'Tippe' : 'Klick oder Leertaste') + ', wenn der Zeiger im grünen Bereich ist (die Schwebung verschwindet).';
+  document.querySelector('#gauge .g').style.width = z * 100 + '%'; document.querySelector('#gauge .o').style.width = z * 200 + '%';
+  [...$('dots').children].forEach((d, i) => d.classList.toggle('ok', i < TU.step));
+}
+function startTune(e) {
+  state = 'tune'; TU = { e, step: 0, t: rnd(0, 3), pos: 0 }; tuneUI(); $('tune').classList.add('on');
+  if (audio()) {
+    const g = AC.createGain(); g.gain.value = muted ? 0 : 0.07;
+    const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1100;
+    lp.connect(g); g.connect(AC.destination); g.connect(reverb);
+    const a = AC.createOscillator(), b = AC.createOscillator();
+    a.setPeriodicWave(pianoWave); b.setPeriodicWave(pianoWave);
+    a.frequency.value = 220; b.frequency.value = 220; a.connect(lp); b.connect(lp); a.start(); b.start();
+    tuneNodes = { g, a, b }; piano(57, 0.2);
+  }
+}
+function endTune() { if (tuneNodes) { try { tuneNodes.a.stop(); tuneNodes.b.stop(); } catch (er) {} tuneNodes = null; } $('tune').classList.remove('on'); state = 'play'; TU = null; }
+function updateTune(dt) {
+  TU.t += dt; TU.pos = Math.sin(TU.t * TUNE_SPEED[TU.step]);
+  $('needle').style.left = (50 + TU.pos * 50) + '%';
+  if (tuneNodes) { tuneNodes.b.frequency.value = 220 + TU.pos * 9; tuneNodes.g.gain.value = muted ? 0 : 0.07; }
+}
+function tuneHit() {
+  if (!TU) return;
+  const e = TU.e;
+  if (Math.abs(TU.pos) <= TUNE_ZONE[TU.step]) {
+    SND.pling();
+    if (++TU.step < 3) return tuneUI();
+    endTune(); cds.fork = TOOLS.fork.cd;
+    makeGood(e, 400, 'GERETTET! +400', 'Stimmen statt Schrotten ✓');
+  } else {
+    endTune(); cds.fork = 6; SND.ploing(); G.shake = 0.3;
+    say(e.x, 4.4, e.z, 'PLOING! Saite gerissen', '#ff6b6b', 22);
+  }
+}
+function redFlash() { const f = $('flash'); f.style.transition = 'none'; f.style.opacity = 0.35; requestAnimationFrame(() => { f.style.transition = ''; f.style.opacity = 0; }); }
+
+/* ---------- Werkzeuge: Modelle ---------- */
+// Kran: Gewicht am Seil
+const craneG = new THREE.Group();
+(function () {
+  const w = mesh(cyl(0.9, 1.5, 1.7, 4), mat(0x2b2b33), 0, 0.85, 0, craneG); w.rotation.y = Math.PI / 4;
+  const t = sprite('1 t', '#ffffff', 1.5); t.position.set(0, 0.9, 1.2); craneG.add(t);
+  mesh(cyl(0.05, 0.05, 60, 6), mat(0x222222), 0, 31.7, 0, craneG, false);
+  scene.add(craneG); craneG.visible = false;
+})();
+const crane = { x: 0, z: -10, y: 12, vy: 0, falling: false, rest: 0 };
+// Zielring + Spur-Markierung
+const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 48), new THREE.MeshBasicMaterial({ color: 0xffb703, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
+ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06; ring.visible = false; scene.add(ring);
+const laneMark = new THREE.Mesh(new THREE.PlaneGeometry(4.3, 72), new THREE.MeshBasicMaterial({ color: 0xffb703, transparent: true, opacity: 0.22, depthWrite: false }));
+laneMark.rotation.x = -Math.PI / 2; laneMark.position.set(0, 0.05, -32); laneMark.visible = false; scene.add(laneMark);
+const aim = new THREE.Vector3(0, 0, -12);
+
+function buildRoller() {
+  const g = new THREE.Group(), y = mat(0xf2b705);
+  mesh(box(3, 1.3, 3), y, 0, 1.6, 0.4, g);
+  mesh(box(2.6, 1.5, 1.6), mat(0xd99a00), 0, 3, 1.1, g);
+  mesh(box(2.2, 0.8, 0.1), mat(0xbfe6ff), 0, 3.15, 0.28, g, false);
+  mesh(cyl(0.16, 0.16, 1.4, 8), mat(0x333333), 1, 2.9, -0.6, g);
+  const drum = mesh(cyl(1.15, 1.15, 3.6, 20), mat(0x6c6f7a), 0, 1.15, -1.9, g); drum.rotation.z = Math.PI / 2;
+  for (const x of [-1.5, 1.5]) { const w = mesh(cyl(1, 1, 0.6, 16), mat(0x2b2b33), x, 1, 1.4, g); w.rotation.z = Math.PI / 2; }
+  const s = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 0.7), new THREE.MeshBasicMaterial({ map: textTex(CONFIG.firma.toUpperCase(), '#1b1b1b', '900 60px system-ui', 512, 128), transparent: true }));
+  s.position.set(0, 1.6, 1.91); g.add(s);
+  g.userData.drum = drum; return g;
+}
+function buildElephant() {
+  const g = new THREE.Group(), grey = mat(0x8d8f98), dk = mat(0x74767f);
+  const sp = (sx, sy, sz, x, y, z, m = grey) => { const me = mesh(sphereGeo, m, x, y, z, g); me.scale.set(sx, sy, sz); return me; };
+  sp(1.7, 1.55, 2.4, 0, 3.1, 0); sp(1.15, 1.2, 1.1, 0, 3.7, 2.5);
+  sp(0.16, 1.1, 0.9, -1.3, 3.9, 2.2, dk); sp(0.16, 1.1, 0.9, 1.3, 3.9, 2.2, dk);
+  const trunk = mesh(cyl(0.34, 0.2, 2.5, 10), grey, 0, 2.45, 3.5, g); trunk.rotation.x = 0.45;
+  for (const x of [-0.5, 0.5]) { const t = mesh(new THREE.ConeGeometry(0.13, 1.1, 8), mat(0xfffaf0), x, 2.85, 3.5, g, false); t.rotation.x = 1.95; }
+  for (const x of [-0.45, 0.45]) sp(0.1, 0.1, 0.1, x, 4.05, 3.45, mat(0x111111));
+  g.userData.legs = [[-0.9, 1.4], [0.9, 1.4], [-0.9, -1.4], [0.9, -1.4]].map(([x, z]) => mesh(cyl(0.46, 0.46, 2, 10), dk, x, 1, z, g));
+  return g;
+}
+
+/* ---------- Werkzeuge: Einsatz ---------- */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+function setRay(ev) { const r = cv.getBoundingClientRect(); ndc.set((ev.clientX - r.left) / r.width * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera); }
+function updateAim() { if (ray.ray.intersectPlane(groundPlane, pv)) aim.set(clamp(pv.x, -6.5, 6.5), 0, clamp(pv.z, -58, 2)); }
+const nearestLane = x => LANES.reduce((b, l, i) => Math.abs(x - l) < Math.abs(x - LANES[b]) ? i : b, 0);
+
+function use() {
+  if (state !== 'play' || cds[tool] > 0) return;
+  const T = TOOLS[tool];
+  if (tool === 'bat' || tool === 'hammer') {
+    cds[tool] = T.cd;
+    const h = ray.intersectObjects(hitList(), false)[0];
+    if (h) {
+      const e = h.object.userData.ent;
+      SND.hit(); burst(h.point.x, h.point.y, h.point.z, 0xffffff, tool === 'hammer' ? 1.6 : 0.9, 0.16);
+      damage(e, T.dmg); G.shake = Math.max(G.shake, tool === 'hammer' ? 0.3 : 0.1);
+    } else tone(300, 0.08, 'sine', 0.05, 0, 120);
+  } else if (tool === 'crane') {
+    if (crane.falling || crane.rest > 0) return;
+    cds.crane = T.cd; crane.x = aim.x; crane.z = aim.z; crane.falling = true; crane.vy = 0; SND.klick();
+  } else if (tool === 'tnt') {
+    if (G.tnt <= 0) { say(aim.x, 1, aim.z, 'Kein Dynamit mehr!', '#ff6b6b', 18); cds.tnt = 0.3; return; }
+    G.tnt--; cds.tnt = T.cd;
+    const m = mesh(cyl(0.16, 0.16, 0.9, 8), mat(0xd62828), 0, 0, 0, scene, false);
+    bombs.push({ kind: 'tnt', m, sx: camBase.x, sy: camBase.y - 2, sz: camBase.z - 3, tx: aim.x, tz: aim.z, t: 0, fl: 0.6, dur: 1, arc: 6 }); SND.klick();
+  } else if (tool === 'rock') {
+    cds.rock = T.cd;
+    const m = mesh(new THREE.DodecahedronGeometry(0.55), mat(0x8d8f98), 0, 0, 0, scene);
+    bombs.push({ kind: 'rock', m, sx: camBase.x - 5, sy: 1, sz: camBase.z - 4, tx: aim.x, tz: aim.z, t: 0, fl: 0.9, dur: 0.9, arc: 11 });
+    tone(200, 0.25, 'sine', 0.1, 0, 500);
+  } else if (tool === 'fall') {
+    cds.fall = T.cd;
+    const g = buildPiano('verstimmt').g; g.position.set(aim.x, 46, aim.z); scene.add(g);
+    fallers.push({ g, x: aim.x, z: aim.z, t: 0, rx: rnd(-3, 3), rz: rnd(-3, 3) });
+    tone(900, 0.6, 'sine', 0.06, 0.4, 200);
+  } else if (tool === 'toni') {
+    if (toni) return;
+    const h = ray.intersectObjects(hitList(), false)[0];
+    if (!h) return;
+    const e = h.object.userData.ent;
+    if (e.key !== 'verstimmt') { cds.toni = 0.4; say(e.x, e.boss ? 6 : 4.4, e.z, e.T.good ? 'Schon perfekt gestimmt ✓' : 'Toni stimmt nur verstimmte Klaviere!', e.T.good ? '#ffd166' : '#ff6b6b', 18); return; }
+    cds.toni = T.cd; e.frozen = true;
+    toni = Object.assign(buildToni(), { e, x: e.x, z: Z_DOOR + 5, phase: 'go', t: 0, ph: 0 });
+    toni.g.rotation.y = Math.PI; toni.g.position.set(toni.x, 0, toni.z); scene.add(toni.g);
+    sayCenter('Toni eilt zu Hilfe!', '#ffd166', 22, 3); SND.neu('gut');
+  } else if (tool === 'fork') {
+    const h = ray.intersectObjects(hitList(), false)[0];
+    if (!h) return;
+    const e = h.object.userData.ent; cds.fork = 0.4;
+    if (e.T.good) say(e.x, 4.2, e.z, 'Schon perfekt gestimmt ✓', '#ffd166', 18);
+    else if (e.key !== 'verstimmt') say(e.x, e.boss ? 6 : 4.6, e.z, e.T.person ? 'Der lässt sich nicht umstimmen!' : e.boss ? 'Der ist nicht zu retten!' : 'Da hilft keine Stimmgabel mehr!', '#ff6b6b', 18);
+    else startTune(e);
+  } else if (tool === 'walze') {
+    if (roller) return;
+    cds.walze = T.cd;
+    const lane = nearestLane(aim.x), g = buildRoller(); g.position.set(LANES[lane], 0, 12); scene.add(g);
+    roller = { g, lane, z: 12, hit: new Set() }; SND.motor();
+  } else if (tool === 'elefant') {
+    if (G.ele < ELE_NEED) { sayCenter('Elefanten schlafen noch (' + G.ele + '/' + ELE_NEED + ')', '#ff6b6b', 18, 3); cds.elefant = 0.4; return; }
+    G.ele = 0; cds.elefant = T.cd;
+    LANES.forEach((x, i) => { const g = buildElephant(); const z = -78 - i * 5; g.position.set(x, 0, z); scene.add(g); elephants.push({ g, x, z, hit: new Set(), ph: i }); });
+    SND.troete();
+  }
+}
+
+/* ---------- Spielschleife ---------- */
+function reset() {
+  for (const e of ents) scene.remove(e.g);
+  for (const d of debrisList) scene.remove(d.m);
+  for (const f of fxList) scene.remove(f.m);
+  for (const b of bombs) scene.remove(b.m);
+  for (const el of elephants) scene.remove(el.g);
+  if (roller) scene.remove(roller.g);
+  for (const r of runners) scene.remove(r.g);
+  for (const f of fallers) scene.remove(f.g);
+  if (TU) endTune();
+  if (toni) { scene.remove(toni.g); toni = null; }
+  ents = []; debrisList = []; fxList = []; bombs = []; elephants = []; runners = []; fallers = []; roller = null;
+  crane.falling = false; crane.rest = 0; crane.y = 12;
+  G = { score: 0, kills: 0, saved: 0, shooed: 0, lives: 3, combo: 0, comboT: 0, t: 0, spawnT: 1, shake: 0, tnt: 3, ele: 0, coup: 0, nextBoss: BOSS_EVERY, bossN: 0, sawing: null };
+  for (const k in cds) cds[k] = 0;
+  $('texts').textContent = '';
+}
+
+function update(dt) {
+  G.t += dt;
+  for (const k in cds) cds[k] = Math.max(0, cds[k] - dt);
+  G.comboT = Math.max(0, G.comboT - dt); if (G.comboT === 0) G.combo = 0;
+
+  const bossAlive = ents.some(e => e.boss);
+  if (!bossAlive && G.kills >= G.nextBoss) { G.nextBoss += BOSS_EVERY; spawnBoss(); }
+  G.spawnT -= dt;
+  if (G.spawnT <= 0) { spawn(); G.spawnT = rnd(0.8, 1.2) * (2.1 - Math.min(diffNow(), 1) * 1.2) * (bossAlive ? 1.4 : 1); }
+
+  // Kettensäge: gedrückt halten
+  G.sawing = null;
+  if (tool === 'saw' && pointerDown) {
+    G.sawing = true;
+    const h = ray.intersectObjects(hitList(), false)[0];
+    if (h) {
+      const e = h.object.userData.ent; G.sawing = e;
+      damage(e, TOOLS.saw.dmg * dt, true); G.shake = Math.max(G.shake, 0.07);
+      if (Math.random() < 0.5) {
+        const m = new THREE.Mesh(unitBox, mat(pick([0xffd166, 0xd9a35c, 0xffffff]))); m.scale.setScalar(0.12); m.position.copy(h.point); scene.add(m);
+        debrisList.push({ m, vx: rnd(-6, 6), vy: rnd(3, 9), vz: rnd(0, 6), rx: 9, rz: 9, life: 0.6 });
+      }
+    }
+  }
+
+  if (toni) updateToni(dt);
+  for (const e of ents) {
+    if (!e.frozen) e.z += e.speed * dt;
+    e.ph += dt; e.punch = Math.max(0, e.punch - dt);
+    e.g.position.z = e.z;
+    const s = (1 + e.punch * 1.4) * e.base; e.g.scale.set(s, s, s);
+    if (!e.T.person) e.g.rotation.z = e.tilt + (e.T.good || e.boss ? 0 : Math.sin(e.ph * 7) * 0.015);
+    for (const a of e.anims) a(e.ph);
+    if (e.T.person) {   // laufen, mit dem Finger wedeln, nörgeln (kostet Punkte)
+      e.legs[0].rotation.x = Math.sin(e.ph * 9) * 0.6; e.legs[1].rotation.x = -Math.sin(e.ph * 9) * 0.6; e.arm.rotation.z = -0.3 + Math.sin(e.ph * 14) * 0.25;
+      e.nagShow -= dt; e.nagT -= dt; e.bub.visible = e.nagShow > 0;
+      if (e.nagT <= 0) {
+        e.nagT = rnd(2.4, 3.4); e.nagShow = 1.9; e.bub.material.map = bubbleTex(pick(NOERGEL));
+        G.score = Math.max(0, G.score - NAG_COST); SND.noergel(); say(e.x + 1.6, 2.6, e.z, '−' + NAG_COST, '#ff6b6b', 16);
+      }
+    }
+    if (e.key === 'cembalo' && Math.random() < dt * 5) burst(e.x + rnd(-4, 4), rnd(1, 4.5), e.z + rnd(-3, 5), pick([0xb9ad8c, 0xa39a80, 0xcfc4a3]), rnd(1.6, 3), 1.8, 0.38);   // Staubwolke
+    if (e.z + (e.boss ? 1.6 : 0) >= Z_DOOR && !e.dead) {
+      removeEnt(e);
+      if (e.T.good) {
+        G.score += e.T.pts; SND.schoen();
+        say(e.x, 3.6, Z_DOOR - 2, '♪ Gestimmt von ' + CONFIG.firma + '!', '#ffd166', 20); say(e.x, 2, Z_DOOR - 2, '+' + e.T.pts + ' Wohlklang', '#fff', 18);
+      } else {
+        G.lives -= e.boss ? 2 : 1; G.combo = 0; redFlash(); G.shake = 0.6; SND.aua();
+        say(e.x, 3, Z_DOOR - 2, e.T.person ? 'Der Nörgler sagt das Konzert ab!' : e.key === 'cembalo' ? 'BAROCKES GESCHEPPER!' : e.boss ? 'DAS GRAUEN SPIELT AUF!' : 'AUA! Meine Ohren!', '#ff6b6b', 24);
+        if (G.lives <= 0) gameOver();
+      }
+    }
+  }
+  // verjagte Pianisten rennen davon
+  for (const r of runners) {
+    r.z -= 22 * dt; r.ph += dt; r.g.position.z = r.z;
+    r.legs[0].rotation.x = Math.sin(r.ph * 24) * 0.9; r.legs[1].rotation.x = -Math.sin(r.ph * 24) * 0.9;
+    if (r.z < -90) scene.remove(r.g);
+  }
+  runners = runners.filter(r => r.z >= -90);
+  // Klavier aus dem 5. Stock
+  for (const f of fallers) {
+    f.t += dt; const k = Math.min(1, f.t);
+    f.g.position.y = 46 * (1 - k * k); f.g.rotation.x += f.rx * dt; f.g.rotation.z += f.rz * dt;
+    if (f.t >= 1) {
+      scene.remove(f.g); SND.crash(); SND.thud(); G.shake = Math.max(G.shake, 0.8);
+      debris({ T: TYPES.verstimmt, x: f.x, z: f.z }, 30, 11); burst(f.x, 1, f.z, 0xd8cfc0, 4, 0.3);
+      areaHit(f.x, f.z, TOOLS.fall.radius, TOOLS.fall.dmg);
+    }
+  }
+  fallers = fallers.filter(f => f.t < 1);
+
+  // Kran
+  if (crane.falling) {
+    crane.vy += 70 * dt; crane.y -= crane.vy * dt;
+    if (crane.y <= 0) {
+      crane.y = 0; crane.falling = false; crane.rest = 0.5;
+      SND.thud(); G.shake = 0.8; burst(crane.x, 0.5, crane.z, 0xd8cfc0, 4, 0.3);
+      areaHit(crane.x, crane.z, TOOLS.crane.radius, 99);
+    }
+  } else if (crane.rest > 0) { crane.rest -= dt; if (crane.rest <= 0) crane.y = 30; }
+  else { crane.y += (12 - crane.y) * Math.min(1, dt * 3); crane.x += (aim.x - crane.x) * Math.min(1, dt * 8); crane.z += (aim.z - crane.z) * Math.min(1, dt * 8); }
+
+  // Dynamit
+  for (const b of bombs) {
+    b.t += dt; const k = Math.min(1, b.t / b.fl);
+    b.m.position.set(b.sx + (b.tx - b.sx) * k, b.sy + (0.4 - b.sy) * k + Math.sin(k * Math.PI) * b.arc, b.sz + (b.tz - b.sz) * k);
+    b.m.rotation.x += dt * 14; b.m.rotation.z += dt * 9;
+    if (b.t >= b.dur && b.kind === 'rock') {
+      scene.remove(b.m); SND.thud(); G.shake = Math.max(G.shake, 0.4); burst(b.tx, 0.6, b.tz, 0xd8cfc0, 2.4, 0.25);
+      areaHit(b.tx, b.tz, TOOLS.rock.radius, TOOLS.rock.dmg);
+    } else if (b.t >= b.dur) {
+      scene.remove(b.m); SND.boom(); G.shake = 1;
+      burst(b.tx, 1.2, b.tz, 0xffb703, TOOLS.tnt.radius, 0.45); burst(b.tx, 1.2, b.tz, 0xffffff, TOOLS.tnt.radius * 0.5, 0.3);
+      boomLight.position.set(b.tx, 4, b.tz); boomLight.intensity = 5;
+      areaHit(b.tx, b.tz, TOOLS.tnt.radius, TOOLS.tnt.dmg);
+    }
+  }
+  bombs = bombs.filter(b => b.t < b.dur);
+  boomLight.intensity = Math.max(0, boomLight.intensity - dt * 12);
+
+  // Dampfwalze
+  if (roller) {
+    roller.z -= 30 * dt; roller.g.position.z = roller.z; roller.g.userData.drum.rotation.x -= dt * 26;
+    for (const e of ents.slice()) if (!e.dead && e.lane === roller.lane && !roller.hit.has(e) && Math.abs(e.z - (roller.z - 2)) < 2.4) { roller.hit.add(e); SND.thud(); damage(e, 99); G.shake = Math.max(G.shake, 0.5); }
+    if (roller.z < -85) { scene.remove(roller.g); roller = null; }
+  }
+  // Elefanten (schonen gute Klaviere)
+  for (const el of elephants) {
+    el.z += 40 * dt; el.g.position.z = el.z; el.g.position.y = Math.abs(Math.sin(el.z * 0.35 + el.ph)) * 0.5;
+    el.g.userData.legs.forEach((l, i) => l.position.y = 1 + Math.max(0, Math.sin(el.z * 0.7 + i * 1.6)) * 0.6);
+    G.shake = Math.max(G.shake, 0.25);
+    for (const e of ents.slice()) if (!e.dead && !e.T.good && e.lane === LANES.indexOf(el.x) && !el.hit.has(e) && Math.abs(e.z - el.z) < 3.5) { el.hit.add(e); damage(e, 99); }
+    if (el.z > 24) scene.remove(el.g);
+  }
+  elephants = elephants.filter(el => el.z <= 24);
+  ents = ents.filter(e => !e.dead);
+
+  // Gutscheine
+  const gs = CONFIG.gutscheine;
+  while (G.coup < gs.length && G.score >= gs[G.coup].ab) {
+    sayCenter('🎟 GUTSCHEIN FREIGESPIELT!', '#ffd166', 30, 0); sayCenter(gs[G.coup].titel + ' bei ' + CONFIG.firma, '#fff', 19, 1);
+    SND.jingle(); G.coup++;
+  }
+}
+function updateFx(dt) {
+  for (const d of debrisList) {
+    d.life -= dt; d.vy -= 30 * dt;
+    d.m.position.x += d.vx * dt; d.m.position.y += d.vy * dt; d.m.position.z += d.vz * dt;
+    d.m.rotation.x += d.rx * dt; d.m.rotation.z += d.rz * dt;
+    if (d.m.position.y < 0.1 && d.vy < 0) { d.m.position.y = 0.1; d.vy *= -0.35; d.vx *= 0.6; d.vz *= 0.6; d.rx *= 0.5; d.rz *= 0.5; }
+    if (d.life < 0.4) d.m.scale.multiplyScalar(Math.max(0, 1 - dt * 5));
+    if (d.life <= 0) scene.remove(d.m);
+  }
+  debrisList = debrisList.filter(d => d.life > 0);
+  for (const f of fxList) {
+    f.t += dt; const k = f.t / f.dur;
+    f.m.scale.setScalar(f.size * (0.3 + 0.7 * k)); f.m.material.opacity = f.op * (1 - k);
+    if (k >= 1) { scene.remove(f.m); f.m.material.dispose(); }
+  }
+  fxList = fxList.filter(f => f.t < f.dur);
+  G.shake = Math.max(0, G.shake - dt * 2.2);
+}
+
+function gameOver() {
+  if (state !== 'play') return;
+  state = 'over';
+  if (G.score > best) { best = G.score; try { localStorage.setItem('smashingPianos3dBest', best); } catch (e) {} }
+  $('finalScore').textContent = G.score; $('finalKills').textContent = G.kills; $('best').textContent = best;
+  $('finalSaved').textContent = G.saved; $('finalShooed').textContent = G.shooed;
+  $('rank').textContent = G.kills >= 60 ? 'Abrissbirne auf zwei Beinen' : G.kills >= 35 ? 'Saitenschreck' : G.kills >= 15 ? 'Hobby-Zertrümmerer' : 'Stimmgabel-Lehrling';
+  $('adLine').textContent = G.kills === 1 ? '1 Klavier war nicht mehr zu retten. Ihres schon:' : G.kills + ' Klaviere waren nicht mehr zu retten. Ihres schon:';
+  const c = $('contact'); c.textContent = '';
+  if (CONFIG.telefon) c.append(document.createElement('br'), '☎ ' + CONFIG.telefon);
+  if (CONFIG.web) { const a = document.createElement('a'); a.href = CONFIG.web; a.target = '_blank'; a.rel = 'noopener'; a.textContent = webShort; c.append(CONFIG.telefon ? ' · ' : document.createElement('br'), a); }
+  const ul = $('coupons'); ul.textContent = '';
+  CONFIG.gutscheine.forEach((g, i) => {
+    const won = i < G.coup, li = document.createElement('li'), l = document.createElement('span'), r = document.createElement(won ? 'code' : 'span');
+    if (won) { l.textContent = '🎟 ' + g.titel; r.textContent = g.code; } else { li.className = 'locked'; l.textContent = '🔒 ' + g.titel; r.textContent = 'ab ' + g.ab + ' Pkt'; }
+    li.append(l, r); ul.append(li);
+  });
+  const h = document.createElement('span'); h.className = 'hint'; h.textContent = G.coup ? CONFIG.gutscheinHinweis : 'Mehr Punkte = Gutscheine freischalten!'; ul.append(h);
+  hsOpen();
+  setTimeout(() => $('over').classList.remove('hidden'), 900);
+}
+function start() { audio(); reset(); state = 'play'; $('menu').classList.add('hidden'); $('over').classList.add('hidden'); }
+
+/* ---------- Anzeige & Eingabe ---------- */
+const toolsEl = $('tools');
+for (const t of TOOLDEF) {
+  const b = document.createElement('button'); b.className = 'tool' + (t.id === tool ? ' sel' : ''); b.dataset.tool = t.id;
+  b.innerHTML = '<span class="ico">' + t.ico + '</span><span class="nm">' + t.nm + (t.id === 'tnt' ? ' <span id="tntN"></span>' : '') + '</span><i class="cd"></i>';
+  b.addEventListener('click', () => selectTool(t.id)); toolsEl.append(b);
+}
+const muteBtn = document.createElement('button'); muteBtn.id = 'mute'; muteBtn.textContent = '🔊'; muteBtn.title = 'Ton an/aus';
+muteBtn.addEventListener('click', () => { muted = !muted; muteBtn.textContent = muted ? '🔇' : '🔊'; }); $('hud').append(muteBtn);
+const toolBtns = [...document.querySelectorAll('.tool[data-tool]')];
+function selectTool(t) { tool = t; toolBtns.forEach(b => b.classList.toggle('sel', b.dataset.tool === t)); SND.klick(); }
+let hudText = '';
+function updateHud() {
+  for (const b of toolBtns) {
+    const t = b.dataset.tool, k = t === 'elefant' ? G.ele / ELE_NEED : cds[t] / TOOLS[t].cd;
+    b.querySelector('.cd').style.width = clamp(k, 0, 1) * 100 + '%';
+    b.classList.toggle('off', (t === 'elefant' && G.ele < ELE_NEED) || (t === 'tnt' && G.tnt <= 0));
+  }
+  const boss = ents.find(e => e.boss), bb = $('boss');
+  bb.style.display = boss && state !== 'menu' ? 'block' : 'none';
+  if (boss) { bb.firstChild.style.width = Math.max(0, boss.hp / boss.maxHp) * 100 + '%'; bb.firstChild.style.background = boss.T.col; bb.lastChild.textContent = boss.T.name.toUpperCase(); }
+  if (sawGain) { sawGain.gain.value = state === 'play' && G.sawing && !muted ? 0.06 : 0; sawOsc.frequency.value = G.sawing && G.sawing !== true ? 150 + Math.random() * 30 : 95; }
+  const next = CONFIG.gutscheine[G.coup];
+  const s = [G.score, G.kills, G.lives, G.combo, G.tnt, G.coup, G.saved].join('|');
+  if (s === hudText) return; hudText = s;
+  $('tntN').textContent = '×' + G.tnt;
+  $('score').textContent = G.score + ' Pkt';
+  $('combo').textContent = G.combo > 1 ? 'KOMBO ×' + G.combo : '';
+  $('info').textContent = 'Geschrottet: ' + G.kills + ' · Gerettet: ' + G.saved + ' · 🎟 ' + (next ? 'nächster Gutschein ab ' + next.ab : 'alle Gutscheine!');
+  $('lives').innerHTML = [0, 1, 2].map(i => '<span' + (i < G.lives ? '' : ' class="lost"') + '>❤️</span>').join('');
+}
+let pointerDown = false;
+cv.addEventListener('pointermove', e => { setRay(e); updateAim(); });
+cv.addEventListener('pointerdown', e => {
+  e.preventDefault(); audio(); touch = e.pointerType !== 'mouse'; pointerDown = true;
+  setRay(e); updateAim();
+  if (tool === 'crane' && !crane.falling && crane.rest <= 0) { crane.x = aim.x; crane.z = aim.z; }
+  use();
+});
+for (const ev of ['pointerup', 'pointercancel', 'blur']) addEventListener(ev, () => pointerDown = false);
+cv.addEventListener('contextmenu', e => e.preventDefault());
+$('tune').addEventListener('pointerdown', e => { e.preventDefault(); touch = e.pointerType !== 'mouse'; tuneHit(); });
+addEventListener('keydown', e => {
+  if (e.target && e.target.tagName === 'INPUT') return;   // beim Tippen des Namens nichts auslösen
+  if (state === 'tune') { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); tuneHit(); } return; }
+  const t = TOOLDEF.find(d => d.key === e.key.toLowerCase());
+  if (t) selectTool(t.id);
+  if ((e.key === 'Enter' || e.key === ' ') && state !== 'play' && !(state === 'over' && $('over').classList.contains('hidden'))) { e.preventDefault(); start(); }
+});
+/* ---------- Online-Rangliste (Supabase) ----------
+   Aktiv, sobald in CONFIG.highscore url und key eingetragen sind. Die Tabelle legt supabase-setup.sql an. */
+const HS_VER = '3d';
+let hsSent = false;
+const hsOn = () => !!(CONFIG.highscore && CONFIG.highscore.url && CONFIG.highscore.key);
+async function hsFetch(path, opt = {}) {
+  const H = CONFIG.highscore;
+  const r = await fetch(H.url.replace(/\/$/, '') + '/rest/v1/' + path, Object.assign({ headers: { apikey: H.key, Authorization: 'Bearer ' + H.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' } }, opt));
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return opt.method ? null : r.json();
+}
+async function hsLoad(me) {
+  const ol = $('hsList');
+  try {
+    const rows = await hsFetch('scores?select=name,score&version=eq.' + HS_VER + '&order=score.desc,created_at.asc&limit=10');
+    ol.textContent = '';
+    let marked = false;
+    for (const row of rows) {
+      const li = document.createElement('li'), s = document.createElement('span');
+      li.textContent = row.name + ' '; s.textContent = row.score; li.append(s);
+      if (me && !marked && row.name === me.name && row.score === me.score) { li.className = 'me'; marked = true; }
+      ol.append(li);
+    }
+    if (!rows.length) $('hsMsg').textContent = 'Noch keine Einträge – sei die oder der Erste!';
+    else if (me && !marked) $('hsMsg').textContent = 'Eingetragen! Für die Top 10 hat es diesmal nicht gereicht.';
+  } catch (e) { $('hsMsg').textContent = 'Die Rangliste ist gerade nicht erreichbar.'; }
+}
+function hsOpen() {
+  if (!hsOn()) return;
+  hsSent = false;
+  $('hs').style.display = ''; $('hsForm').style.display = G.score > 0 ? '' : 'none';
+  $('hsMsg').textContent = G.score > 0 ? 'Gespeichert werden nur Spitzname, Punkte und Datum.' : '';
+  try { $('hsName').value = localStorage.getItem('smashingPianosName') || ''; } catch (e) {}
+  hsLoad();
+}
+$('hsForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('hsName').value.trim().replace(/\s+/g, ' ').slice(0, 16);
+  if (!name || hsSent) return;
+  hsSent = true; $('hsMsg').textContent = 'Wird eingetragen …';
+  try { localStorage.setItem('smashingPianosName', name); } catch (er) {}
+  try {
+    await hsFetch('scores', { method: 'POST', body: JSON.stringify({ name, score: G.score, kills: G.kills, version: HS_VER }) });
+    $('hsForm').style.display = 'none'; $('hsMsg').textContent = 'Eingetragen!';
+    hsLoad({ name, score: G.score });
+  } catch (er) { hsSent = false; $('hsMsg').textContent = 'Eintragen hat nicht geklappt. Bitte nochmals versuchen.'; }
+});
+$('startBtn').addEventListener('click', start);
+$('againBtn').addEventListener('click', start);
+
+reset(); resize();
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (cv.width !== Math.floor(cv.clientWidth * renderer.getPixelRatio())) resize();
+  if (state === 'play') update(dt);
+  else if (state === 'tune' && TU) updateTune(dt);
+  if (state !== 'tune') updateFx(dt);
+  const bi = Math.floor(now / 5000); if (bi !== boardIdx) drawBoard(boardIdx = bi);
+  // Zielhilfen
+  const play = state === 'play', showAim = play && (!touch || pointerDown);
+  ring.visible = showAim && (tool === 'crane' || tool === 'tnt' || tool === 'rock' || tool === 'fall');
+  if (ring.visible) { ring.position.set(aim.x, 0.06, aim.z); ring.scale.setScalar(TOOLS[tool].radius); }
+  laneMark.visible = showAim && tool === 'walze' && !roller && cds.walze <= 0;
+  if (laneMark.visible) laneMark.position.x = LANES[nearestLane(aim.x)];
+  craneG.visible = play && (tool === 'crane' || crane.falling || crane.rest > 0) && crane.y < 29;
+  craneG.position.set(crane.x, crane.y, crane.z);
+  camera.position.set(camBase.x + rnd(-1, 1) * G.shake, camBase.y + rnd(-1, 1) * G.shake, camBase.z);
+  camera.lookAt(camLook);
+  renderer.render(scene, camera);
+  updateHud();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

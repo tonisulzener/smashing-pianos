@@ -26,9 +26,13 @@
   .overlay > :first-child { margin-top:auto; } .overlay > :last-child { margin-bottom:auto; }
   .overlay.hidden { display:none; }
   #menu { background:#0d0b12f5; }
+  #over { position:fixed; z-index:10; background:#0d0b12f0; }   /* ganzer Bildschirm: Platz für Gutscheine und Rangliste */
   #menu .rules { color:#fff; }
   h1 { margin:0; font-size:clamp(26px,6.5vw,62px); letter-spacing:.02em; font-weight:900; color:var(--acc); text-shadow:0 4px 0 #b3261e, 0 8px 18px #000; transform:rotate(-2deg); }
   h2 { margin:0; font-size:clamp(20px,4.2vw,38px); color:var(--acc); }
+  .versions { margin:0; display:inline-flex; border:2px solid var(--acc); border-radius:999px; overflow:hidden; font-weight:800; font-size:clamp(12px,2vw,15px); flex:none; }
+  .versions a, .versions span { padding:.3em 1.2em; text-decoration:none; color:var(--acc); }
+  .versions span { background:var(--acc); color:#1b1b1b; }
   .sub { color:var(--mut); font-size:clamp(11px,1.9vw,16px); margin:0; }
   .rules { font-size:clamp(10px,1.7vw,14.5px); line-height:1.45; max-width:660px; margin:0; }
   .rules b { color:var(--acc); }
@@ -43,9 +47,18 @@
   .coupons li.locked { color:#8a8a8a; }
   .coupons code { background:#ffe9a3; border:1px dashed #b3261e; border-radius:4px; padding:0 .45em; font-weight:800; white-space:nowrap; }
   .coupons .hint { display:block; text-align:center; color:#666; font-size:.9em; margin-top:.3em; }
+  .hs { background:#221f2b; border:2px solid #3a3547; border-radius:10px; padding:.6em 1em; max-width:600px; width:100%; font-size:clamp(12px,1.75vw,14.5px); text-align:left; color:#f4efe6; }
+  .hs form { display:flex; gap:6px; margin:.4em 0; }
+  .hs input { flex:1; min-width:0; font:inherit; padding:.35em .6em; border-radius:8px; border:2px solid #4a4459; background:#14121a; color:#fff; -webkit-user-select:text; user-select:text; }
+  .hs form button { font:inherit; font-weight:800; padding:.35em .9em; border:0; border-radius:8px; background:var(--acc); color:#1b1b1b; cursor:pointer; }
+  .hs ol { margin:.3em 0 0; padding-left:1.9em; columns:2; column-gap:2em; }
+  .hs li { break-inside:avoid; } .hs li span { float:right; font-variant-numeric:tabular-nums; }
+  .hs li.me { color:var(--acc); font-weight:800; }
+  .hs small { color:#a59fb3; display:block; margin-top:.3em; }
   .presented { font-size:clamp(10px,1.6vw,13px); color:var(--mut); margin:0; }
   .presented b { color:var(--ink); }
-  #tools { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-top:10px; }
+  #tools { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:10px; }
+  #tools .tool:last-child { grid-column:span 2; }   /* 11 Werkzeuge: Toni bekommt den Platz von zwei Knöpfen */
   .tool { position:relative; overflow:hidden; font:inherit; color:var(--ink); background:var(--panel); border:2px solid #3a3547; border-radius:10px; padding:6px 4px; cursor:pointer; text-align:center; }
   .tool .ico { font-size:21px; line-height:1; display:block; }
   .tool .nm { font-size:11.5px; font-weight:700; display:block; margin-top:2px; }
@@ -90,7 +103,7 @@
              width:min(calc(100vh * 16 / 9), calc(100vw - 184px - env(safe-area-inset-left) - env(safe-area-inset-right)));
              width:min(calc(100dvh * 16 / 9), calc(100vw - 184px - env(safe-area-inset-left) - env(safe-area-inset-right))); }
     #side { flex:1; min-width:176px; max-width:220px; height:100%; display:flex; flex-direction:column; gap:4px; padding:4px; }
-    #tools { flex:1; grid-template-columns:1fr 1fr; grid-template-rows:repeat(5,1fr); margin:0; gap:4px; min-height:0; }
+    #tools { flex:1; grid-template-columns:1fr 1fr; grid-template-rows:repeat(6,1fr); margin:0; gap:3px; min-height:0; }
     .tool { padding:2px; min-height:0; display:flex; flex-direction:column; justify-content:center; }
     .tool { background:#2b2736; border-color:#4a4459; }
     .tool.sel { background:#4a3a2a; }
@@ -115,6 +128,7 @@
     <div id="menu" class="overlay">
       <h1>SMASHING PIANOS</h1>
       <p class="sub">Das Spiel für Klavierstimmer und Klavierspieler mit Nerven am Ende</p>
+      <p class="versions"><span>2D</span><a href="3d/index.html">3D</a></p>
       <p class="rules">
         Verstimmte, verschimmelte und abgesoffene Klaviere rollen Richtung <b>Konzertsaal</b>. Mach sie platt, bevor sie ankommen!<br>
         <b>Achtung:</b> Glänzende, frisch gestimmte Klaviere mit dem goldenen ✓ lässt du durch.<br>
@@ -137,6 +151,12 @@
         <span id="contact"></span>
         <ul class="coupons" id="coupons"></ul>
       </div>
+      <div class="hs" id="hs" style="display:none">
+        <b>🏆 Rangliste</b>
+        <form id="hsForm"><input id="hsName" maxlength="16" placeholder="Dein Spitzname" autocomplete="off" enterkeyhint="send"><button type="submit">Eintragen</button></form>
+        <ol id="hsList"></ol>
+        <small id="hsMsg"></small>
+      </div>
       <button class="go" id="againBtn">Nochmal!</button>
     </div>
   </div>
@@ -145,7 +165,7 @@
     <div id="status"></div>
     <div id="tools"></div>
     <div id="foot">
-      <span class="hint">Tasten 1–9 und 0 wählen das Werkzeug · Kettensäge: Maustaste gedrückt halten</span>
+      <span class="hint">Tasten 1–9, 0 und T wählen das Werkzeug · Kettensäge: Maustaste gedrückt halten</span>
       <span class="btns"><button id="fs">⛶ Vollbild</button><button id="mute">🔊 Ton</button></span>
     </div>
   </div>
@@ -178,6 +198,7 @@ const CONFIG = {
     { ab: 6000,  titel: '15% Rabatt auf eine Klavierbank', code: 'BANK15' },
     { ab: 10000, titel: '10% auf die nächste Stimmung', code: 'STIMMUNG10' }
   ],
+  highscore: { url: 'https://zeecomhamqofjgnshovr.supabase.co', key: 'sb_publishable_37lWs5m90CUacUe6nNvnUQ_5lyiUGMJ' },   // Supabase: Projekt-URL und öffentlicher Schlüssel (leer = Rangliste aus)
   gutscheinHinweis: 'Code bei Pianos Sulzener nennen und einlösen.'
 };
 
@@ -220,7 +241,8 @@ const TOOLDEF = [
   { id: 'fall',    key: '7', ico: '🎹', nm: '5. Stock',        inf: 'Klavier von oben',   dmg: 6,  cd: 4,   radius: 90 },
   { id: 'walze',   key: '8', ico: '🚜', nm: 'Dampfwalze',      inf: 'plättet eine Spur',  dmg: 99, cd: 16 },
   { id: 'elefant', key: '9', ico: '🐘', nm: 'Elefant',         inf: 'schont gute Klaviere', dmg: 99, cd: 1 },
-  { id: 'fork',    key: '0', ico: '🎵', nm: 'Stimmgabel',      inf: 'retten statt schrotten', dmg: 0, cd: 3 }
+  { id: 'fork',    key: '0', ico: '🎵', nm: 'Stimmgabel',      inf: 'retten statt schrotten', dmg: 0, cd: 3 },
+  { id: 'toni',    key: 't', ico: '🧑‍🔧', nm: 'Toni',            inf: 'stimmt für dich',    dmg: 0,  cd: 22 }
 ];
 const TOOLS = Object.fromEntries(TOOLDEF.map(t => [t.id, t]));
 const NOERGEL = ['Das A ist zu hoch!', 'Die Tasten sind zu weiss!', 'Der Hocker quietscht!', 'Zu viel Hall hier!', '442 Hz? Ich höre 442,3 Hz!',
@@ -231,6 +253,7 @@ const NAG_COST = 25;
 const KRACH = ['KRACH!', 'SCHEPPER!', 'DOING!', 'PLÄNG!', 'RUMMS!', 'KLONK!', 'ZACK!', 'SPLITTER!'];
 
 let state = 'menu', tool = 'bat';
+let toni = null;   // Klavierstimmer Toni, wenn er gerade unterwegs ist
 let pianos, parts, texts, fx, bombs, fallers, runners, roller, elephant, crane, G, TU = null;
 const mouse = { x: W / 2, y: 300, down: false };
 let touch = matchMedia('(hover: none)').matches;   // Fingerbedienung: grössere Trefferzonen, Zielhilfen nur beim Drücken
@@ -241,7 +264,7 @@ try { best = +localStorage.getItem('smashingPianosBest') || 0; } catch (e) {}
 function saveBest() { try { localStorage.setItem('smashingPianosBest', best); } catch (e) {} }
 
 function reset() {
-  pianos = []; parts = []; texts = []; fx = []; bombs = []; fallers = []; runners = []; roller = null; elephant = null; TU = null;
+  pianos = []; parts = []; texts = []; fx = []; bombs = []; fallers = []; runners = []; toni = null; roller = null; elephant = null; TU = null;
   crane = { x: W / 2, fall: null, rest: 0 };
   G = { score: 0, kills: 0, saved: 0, shooed: 0, lives: 3, combo: 0, comboT: 0, t: 0, spawnT: 1, shake: 0, tnt: 3, flash: 0,
         ele: 0, nextBoss: BOSS_EVERY, bossN: 0, coup: 0 };   // coup: in DIESEM Spiel freigespielte Gutscheine
@@ -509,6 +532,14 @@ function use(x, y) {
     G.ele = 0; cds.elefant = T.cd;
     elephant = { x: W + 130, hit: new Set() };
     SND.troete();
+  } else if (tool === 'toni') {
+    if (toni) return;
+    const p = pianoAt(x, y);
+    if (!p) return;
+    if (p.key !== 'verstimmt') { cds.toni = 0.4; say(p.x, p.y - p.h - 10, p.T.good ? 'Schon perfekt gestimmt ✓' : 'Toni stimmt nur verstimmte Klaviere!', p.T.good ? '#ffd166' : '#ff6b6b', 18); return; }
+    cds.toni = T.cd; p.frozen = true;
+    toni = { x: DOOR_X + 6, y: p.y, s: p.s, p, phase: 'go', t: 0, ph: 0 };
+    say(170, p.y - 130, 'Toni eilt zu Hilfe!', '#ffd166', 20); SND.neu('gut');
   } else if (tool === 'fork') {
     const p = pianoAt(x, y);
     if (!p) return;
@@ -535,6 +566,27 @@ function craneLand(f) {
 }
 const FAKE = { T: TYPES.verstimmt, key: 'fall', s: 1, w: 112, h: 108, hp: 1, maxHp: 1, ph: 0, flash: 0, keys: Array(14).fill(0), spots: [] };
 
+// aus einem verstimmten Klavier wird ein frisch gestimmtes
+function makeGood(p, pts, msg, sub) {
+  p.key = 'gut'; p.T = TYPES.gut; p.hp = p.maxHp = TYPES.gut.hp; p.tilt = 0; p.frozen = false;
+  G.saved++; G.score += pts; SND.schoen();
+  say(p.x, p.y - p.h - 40, msg, '#ffd166', 28, 1.8);
+  say(p.x, p.y - p.h - 12, sub, '#fff', 17, 1.8);
+}
+/* ----- Klavierstimmer Toni: läuft zum Klavier, stimmt es, geht zurück ----- */
+function updateToni(dt) {
+  const t = toni; t.ph += dt;
+  if (t.phase !== 'back' && t.p.dead) t.phase = 'back';
+  if (t.phase === 'go') {
+    const tx = t.p.x - 64 * t.s, d = tx - t.x;
+    t.x += Math.sign(d) * Math.min(Math.abs(d), 470 * dt);
+    if (Math.abs(tx - t.x) < 2) { t.phase = 'tune'; t.t = 0; }
+  } else if (t.phase === 'tune') {
+    t.t += dt;
+    if (Math.random() < dt * 6) piano(pick([57, 61, 64, 69]), 0.1, 0, 40 * (1 - t.t / 1.6), 0.5);   // wird hörbar sauberer
+    if (t.t >= 1.6) { makeGood(t.p, 300, 'Toni hat es gerichtet! +300', 'Gestimmt von ' + CONFIG.firma + ' ✓'); t.phase = 'back'; }
+  } else { t.x -= 470 * dt; if (t.x < DOOR_X) toni = null; }
+}
 /* ----- Stimm-Minispiel ----- */
 const TUNE_ZONE = [0.17, 0.13, 0.095], TUNE_SPEED = [2.6, 3.4, 4.3];
 function startTune(p) {
@@ -562,10 +614,7 @@ function tuneHit() {
     SND.pling();
     if (++TU.step < 3) return;
     stopTuneSound(); state = 'play'; TU = null; cds.fork = TOOLS.fork.cd;
-    p.key = 'gut'; p.T = TYPES.gut; p.hp = p.maxHp = TYPES.gut.hp; p.tilt = 0;
-    G.saved++; G.score += 400; SND.schoen();
-    say(p.x, p.y - p.h - 40, 'GERETTET! +400', '#ffd166', 28, 1.8);
-    say(p.x, p.y - p.h - 12, 'Stimmen statt Schrotten ✓', '#fff', 17, 1.8);
+    makeGood(p, 400, 'GERETTET! +400', 'Stimmen statt Schrotten ✓');
   } else {
     stopTuneSound(); state = 'play'; TU = null; cds.fork = 6;
     SND.ploing(); G.shake = 5;
@@ -596,8 +645,10 @@ function update(dt) {
     }
   }
 
+  if (toni) updateToni(dt);
   for (const p of pianos) {
-    p.x -= p.speed * dt; p.flash = Math.max(0, p.flash - dt); p.ph += dt;
+    if (!p.frozen) p.x -= p.speed * dt;
+    p.flash = Math.max(0, p.flash - dt); p.ph += dt;
     if (p.T.person) {   // Nörgeln kostet Punkte
       p.nagShow -= dt; p.nagT -= dt;
       if (p.nagT <= 0) {
@@ -709,6 +760,7 @@ function gameOver() {
     ul.append(h);
   }
   ul.style.display = CONFIG.gutscheine.length ? '' : 'none';
+  hsOpen();
   setTimeout(() => $('over').classList.remove('hidden'), 900);
 }
 function start() {
@@ -909,6 +961,51 @@ function drawPianist(p, run) {
     const w = 36 * p.s, x = p.x - w / 2, y = p.y - 172 * p.s;
     ctx.fillStyle = '#000a'; ctx.fillRect(x - 1, y - 1, w + 2, 7);
     ctx.fillStyle = '#e63946'; ctx.fillRect(x, y, w * Math.max(0, p.hp / p.maxHp), 5);
+  }
+}
+
+function drawToni(t) {
+  const dir = t.phase === 'back' ? -1 : 1, walk = t.phase === 'tune' ? 0 : Math.sin(t.ph * 22);
+  ctx.save(); ctx.translate(t.x, t.y); ctx.scale(t.s * dir, t.s);
+  ctx.fillStyle = '#0005'; ctx.beginPath(); ctx.ellipse(0, 2, 26, 6, 0, 0, 7); ctx.fill();
+  ctx.lineCap = 'round';
+  const SUIT = '#141d33', SUIT2 = '#0b1120';                                        // schwarzblauer Anzug
+  ctx.strokeStyle = SUIT; ctx.lineWidth = 9;
+  for (const k of [1, -1]) {
+    ctx.beginPath(); ctx.moveTo(0, -50); ctx.lineTo(walk * 14 * k, -5); ctx.stroke();
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(walk * 14 * k + 5, -3, 9, 4, 0, 0, 7); ctx.fill();   // Lackschuhe
+  }
+  // schwarze Arzttasche in der hinteren Hand
+  ctx.strokeStyle = SUIT; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(-10, -84); ctx.lineTo(-22, -60); ctx.stroke();
+  ctx.strokeStyle = '#111'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(-22, -55, 6, Math.PI, 0); ctx.stroke();
+  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.moveTo(-37, -34); ctx.lineTo(-39, -48); ctx.quadraticCurveTo(-22, -60, -5, -48); ctx.lineTo(-7, -34); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#c9a227'; ctx.fillRect(-25, -52, 6, 4);                          // Verschluss
+  // Jackett, Hemd, Krawatte
+  ctx.fillStyle = SUIT; rr(-14, -93, 28, 50, 8); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(2, -93); ctx.lineTo(14, -93); ctx.lineTo(9, -70); ctx.fill();
+  ctx.fillStyle = '#27407a'; ctx.beginPath(); ctx.moveTo(9, -92); ctx.lineTo(12, -88); ctx.lineTo(10, -72); ctx.lineTo(7, -88); ctx.fill();
+  ctx.strokeStyle = SUIT2; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(3, -93); ctx.lineTo(8, -70); ctx.lineTo(8, -45); ctx.stroke();   // Revers
+  // vorderer Arm mit Stimmhammer
+  ctx.save(); ctx.translate(6, -84); ctx.rotate(-0.7 + (t.phase === 'tune' ? Math.sin(t.ph * 16) * 0.45 : walk * 0.4));
+  ctx.strokeStyle = SUIT; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(22, 0); ctx.stroke();
+  ctx.strokeStyle = '#f1c9a5'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(24, 0); ctx.lineTo(26, 0); ctx.stroke();
+  ctx.strokeStyle = '#9aa0aa'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(26, 0); ctx.lineTo(44, -8); ctx.stroke();
+  ctx.fillStyle = '#7a4a2a'; rr(22, -5, 12, 9, 3); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = '#f1c9a5'; ctx.beginPath(); ctx.arc(0, -105, 12, 0, 7); ctx.fill();                       // Kopf
+  ctx.fillStyle = '#6b4226';                                                                                 // braune Haare
+  ctx.beginPath(); ctx.arc(-1, -108, 13, Math.PI * 0.95, Math.PI * 1.95); ctx.lineTo(8, -113); ctx.quadraticCurveTo(0, -109, -9, -108); ctx.lineTo(-13, -100); ctx.fill();
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(6, -104, 1.8, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#222'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(4, -100, 5, 0.2, 1.7); ctx.stroke();   // Lächeln
+  ctx.lineCap = 'butt';
+  ctx.restore();
+  // Namensschild
+  const fs = SMALL ? 20 : 12; ctx.font = '800 ' + fs + 'px system-ui'; ctx.textAlign = 'center';
+  const w = ctx.measureText('Toni').width + 14, ny = t.y - 128 * t.s - fs;
+  ctx.fillStyle = '#b3261e'; rr(t.x - w / 2, ny - fs, w, fs + 7, 6); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fillText('Toni', t.x, ny);
+  if (t.phase === 'tune') {   // Fortschritt beim Stimmen
+    ctx.fillStyle = '#000a'; ctx.fillRect(t.x - 26, ny + 10, 52, 6); ctx.fillStyle = '#2a9d8f'; ctx.fillRect(t.x - 25, ny + 11, 50 * Math.min(1, t.t / 1.6), 4);
   }
 }
 
@@ -1162,6 +1259,7 @@ function render(time) {
   drawBackground(time);
   const items = pianos.map(p => ({ y: p.y, f: () => drawPiano(p) }));
   for (const r of runners) items.push({ y: r.y, f: () => drawPianist(r, true) });
+  if (toni) items.push({ y: toni.y + 0.5, f: () => drawToni(toni) });
   if (roller) items.push({ y: LANES[roller.lane].y + 1, f: () => drawRoller(roller) });
   items.sort((a, b) => a.y - b.y).forEach(i => i.f());
   drawHall();
@@ -1227,10 +1325,58 @@ cv.addEventListener('pointerdown', e => {
 });
 for (const ev of ['pointerup', 'pointercancel', 'blur']) addEventListener(ev, () => mouse.down = false);
 addEventListener('keydown', e => {
+  if (e.target && e.target.tagName === 'INPUT') return;   // beim Tippen des Namens nichts auslösen
   if (state === 'tune') { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); tuneHit(); } return; }
-  const t = TOOLDEF.find(d => d.key === e.key);
+  const t = TOOLDEF.find(d => d.key === e.key.toLowerCase());
   if (t) selectTool(t.id);
   if ((e.key === 'Enter' || e.key === ' ') && state !== 'play' && !(state === 'over' && $('over').classList.contains('hidden'))) { e.preventDefault(); start(); }
+});
+/* ---------- Online-Rangliste (Supabase) ----------
+   Aktiv, sobald in CONFIG.highscore url und key eingetragen sind. Die Tabelle legt supabase-setup.sql an. */
+const HS_VER = '2d';
+let hsSent = false;
+const hsOn = () => !!(CONFIG.highscore && CONFIG.highscore.url && CONFIG.highscore.key);
+async function hsFetch(path, opt = {}) {
+  const H = CONFIG.highscore;
+  const r = await fetch(H.url.replace(/\/$/, '') + '/rest/v1/' + path, Object.assign({ headers: { apikey: H.key, Authorization: 'Bearer ' + H.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' } }, opt));
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return opt.method ? null : r.json();
+}
+async function hsLoad(me) {
+  const ol = $('hsList');
+  try {
+    const rows = await hsFetch('scores?select=name,score&version=eq.' + HS_VER + '&order=score.desc,created_at.asc&limit=10');
+    ol.textContent = '';
+    let marked = false;
+    for (const row of rows) {
+      const li = document.createElement('li'), s = document.createElement('span');
+      li.textContent = row.name + ' '; s.textContent = row.score; li.append(s);
+      if (me && !marked && row.name === me.name && row.score === me.score) { li.className = 'me'; marked = true; }
+      ol.append(li);
+    }
+    if (!rows.length) $('hsMsg').textContent = 'Noch keine Einträge – sei die oder der Erste!';
+    else if (me && !marked) $('hsMsg').textContent = 'Eingetragen! Für die Top 10 hat es diesmal nicht gereicht.';
+  } catch (e) { $('hsMsg').textContent = 'Die Rangliste ist gerade nicht erreichbar.'; }
+}
+function hsOpen() {
+  if (!hsOn()) return;
+  hsSent = false;
+  $('hs').style.display = ''; $('hsForm').style.display = G.score > 0 ? '' : 'none';
+  $('hsMsg').textContent = G.score > 0 ? 'Gespeichert werden nur Spitzname, Punkte und Datum.' : '';
+  try { $('hsName').value = localStorage.getItem('smashingPianosName') || ''; } catch (e) {}
+  hsLoad();
+}
+$('hsForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('hsName').value.trim().replace(/\s+/g, ' ').slice(0, 16);
+  if (!name || hsSent) return;
+  hsSent = true; $('hsMsg').textContent = 'Wird eingetragen …';
+  try { localStorage.setItem('smashingPianosName', name); } catch (er) {}
+  try {
+    await hsFetch('scores', { method: 'POST', body: JSON.stringify({ name, score: G.score, kills: G.kills, version: HS_VER }) });
+    $('hsForm').style.display = 'none'; $('hsMsg').textContent = 'Eingetragen!';
+    hsLoad({ name, score: G.score });
+  } catch (er) { hsSent = false; $('hsMsg').textContent = 'Eintragen hat nicht geklappt. Bitte nochmals versuchen.'; }
 });
 $('startBtn').addEventListener('click', start);
 $('againBtn').addEventListener('click', start);
