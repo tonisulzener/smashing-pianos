@@ -268,9 +268,19 @@ function audio() {
       sawOsc.connect(sawGain).connect(AC.destination); sawOsc.start();
     } catch (e) { AC = null; }
   }
-  if (AC && AC.state === 'suspended') AC.resume();
+  if (AC && AC.state !== 'running' && AC.state !== 'closed') AC.resume().catch(() => {});
   return AC;
 }
+/* iOS: Der Ton kann «interrupted» sein (Bildschirmsperre, Mitteilung, Tastatur) oder als «running» gelten und trotzdem
+   stumm bleiben. Darum wird bei jedem Spielstart (Tipp = Nutzeraktion) eine frische Audio-Verbindung aufgebaut. */
+function freshAudio() {
+  if (AC) { try { AC.close(); } catch (e) {} }
+  AC = null; tuneNodes = null;
+  const ac = audio();
+  if (!ac) return;
+  try { const s = ac.createBufferSource(); s.buffer = ac.createBuffer(1, 1, 22050); s.connect(ac.destination); s.start(0); } catch (e) {}   // iOS entsperren
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && AC && AC.state === 'running') AC.suspend().catch(() => {}); });
 function tone(f, dur, type = 'triangle', vol = 0.12, delay = 0, f2 = null) {
   if (muted || !audio()) return;
   const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
@@ -1090,7 +1100,7 @@ function gameOver() {
   hsOpen();
   setTimeout(() => $('over').classList.remove('hidden'), 900);
 }
-function start() { audio(); reset(); state = 'play'; $('menu').classList.add('hidden'); $('over').classList.add('hidden'); }
+function start() { reset(); freshAudio(); state = 'play'; $('menu').classList.add('hidden'); $('over').classList.add('hidden'); }
 
 /* ---------- Anzeige & Eingabe ---------- */
 const toolsEl = $('tools');
